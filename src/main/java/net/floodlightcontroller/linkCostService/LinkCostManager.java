@@ -23,6 +23,9 @@ import org.slf4j.LoggerFactory;
 
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.IOFSwitch.PortChangeType;
+import net.floodlightcontroller.core.IOFSwitchListener;
+import net.floodlightcontroller.core.ImmutablePort;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
@@ -32,7 +35,7 @@ import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 
-public class LinkCostManager implements ILinkCostService, IFloodlightModule {
+public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFSwitchListener{
 	
 	private Map<Link, Integer> linkCost = new HashMap<Link, Integer>();   //dijkstra算法使用的链路权重
 	private IFloodlightProviderService floodlightProvider=null;
@@ -42,7 +45,8 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 	private Map<Long,Map<Short,Long[]>> lastTimePortTraffic=new HashMap<Long,Map<Short,Long[]>>();
 	protected static Logger log = LoggerFactory.getLogger(LinkCostManager.class);
 	private Map<Long,Map<Short,Double>> portUtilization_x10=new HashMap<Long,Map<Short,Double>>();
-	private boolean initialFlag=true;
+	private boolean initialFlag = true;
+	
 	/**
 	 * linkCost的getter方法
 	 * @return
@@ -52,35 +56,42 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 	public Map<Link,Integer> getLinkCost(){
 		return linkCost;
 	}
+	
 	/**
 	 * 更新linkCost的值
 	 */
 	public void updateLinkCost(){
 		
-		Map<Long,Set<Link>> topologyLink=linkDiscoveryManager.getSwitchLinks();
-		Object[] dpids=topologyLink.keySet().toArray();  //可以直接作为long使用
-		
-		for(int i=0;i< dpids.length;i++){
-			Set<Link> links=topologyLink.get(dpids[i]);
-			Iterator<Link> iteratorLink=links.iterator();
-			while(iteratorLink.hasNext()){
-				Link link=iteratorLink.next();
-				short portNumber=link.getSrcPort();
-				Double cost=portUtilization_x10.get(dpids[i]).get(portNumber);
-				linkCost.put(link,(int)Math.ceil(cost*10));
+		if(initialFlag){
+			synchronized(portUtilization_x10){
+				Map<Long,Set<Link>> topologyLink=linkDiscoveryManager.getSwitchLinks();
+				Set<Long> switchIds= topologyLink.keySet();  //虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
+				Iterator<Long> iteratorSwitchId=switchIds.iterator();
+				while(iteratorSwitchId.hasNext()){
+					long dpid=iteratorSwitchId.next();
+					Set<Link> links=topologyLink.get(dpid);
+					Iterator<Link> iteratorLink=links.iterator();
+					while(iteratorLink.hasNext()){
+						Link link=iteratorLink.next();
+						short portNumber=link.getSrcPort();
+						long dpid1=link.getSrc();
+						Double cost=portUtilization_x10.get(dpid1).get(portNumber);
+						linkCost.put(link,(int)Math.ceil(cost*10));
+					}
+				}
 			}
-			
 		}
-		
-		
 	}
+	
 	/**
 	 * 设置linkCost的值，linkCost的值时通过链路利用率映射为一个linkCost的一个值
 	 */
+	
 	public void mapTrafficToLinkCost(){
 		if(!initialFlag){     //当要进行更新linkCost时，就删除linkCost；
 			linkCost.clear();  
 		}
+		
 		Map<Long,List<OFStatistics>> netTraffic=new HashMap<Long,List<OFStatistics>>();
 		netTraffic=this.collectTraffic();
 		Set<Long> dpids=netTraffic.keySet();    //网络中的所有的交换机的dpid；
@@ -108,12 +119,13 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 	        	currentPortTraffic[0]=transmitBytes;
 	        	currentPortTraffic[1]=receiveBytes;
 	        	
-	        	if( !initialFlag ){        	        		
+	        	if( !initialFlag ){
+	        		
 	        		long transmitByteRate =currentPortTraffic[0]-lastTimePortTraffic.get(dpid).get(portNumber)[0];
 	        		long receiveByteRate = currentPortTraffic[1]-lastTimePortTraffic.get(dpid).get(portNumber)[1];
 	        		long portByteRate_5s=0;
 	        		
-	        		if(transmitByteRate>receiveByteRate){
+	        		if( transmitByteRate > receiveByteRate ){
 	        			portByteRate_5s = transmitByteRate;
 	        		}else{
 	        			portByteRate_5s = receiveByteRate;
@@ -121,20 +133,47 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 	        		
 	        		//portByteRate表示在间隔5s内发送的数据总数，以字节的单位进行计算
 	        	    double portRate_Mbps=8*portByteRate_5s/(1024.0*1024.0*5);
-	        		if(portRate_Mbps<0.0001){
+	        		
+	        	    if(portRate_Mbps<0.0001){
 	        			portRate_Mbps=0;
 	        		}
+	        	    
 	        		//默认设置的链路带宽时100Mbps；
-	        		double portUtilization_eachPort_x10=portRate_Mbps/100.0*10;
+	        		//double portUtilization_eachPort_x10=(portRate_Mbps/100.0)*10;
+	        	    double portUtilization_eachPort_x10=portRate_Mbps;
 	        		portUtilizationx10Map.put(portNumber, portUtilization_eachPort_x10);
+	        		
 	        	}
 	        	portTraffic.put( portNumber, currentPortTraffic );
-	        	initialFlag=initialFlag?false:true;
+	        	
 	        }
-			portUtilization_x10.put(dpid,portUtilizationx10Map);
+			
+			if(!initialFlag){
+				portUtilization_x10.put(dpid,portUtilizationx10Map);
+			}
 			lastTimePortTraffic.put(dpid,portTraffic);
 		}
+		initialFlag=initialFlag?false:true;
+		
 	}
+	/*public void print(){
+		
+		Set<Long> dpids=portUtilization_x10.keySet();
+		
+		Iterator<Long> iteratorDpid= dpids.iterator();
+		while(iteratorDpid.hasNext()){
+			long dpid=iteratorDpid.next();
+			Map<Short,Double> portTraffic=portUtilization_x10.get(dpid);
+			Set<Short> portId=portTraffic.keySet();
+			Iterator<Short> iteratorPort = portId.iterator();
+			while(iteratorPort.hasNext()){
+				short port=iteratorPort.next();
+				double traffic=portTraffic.get(port);
+				
+				System.out.println(dpid+" "+ port+ " "+traffic);
+			}
+		}
+	}*/
 	/***
 	 * 获取交换机各个端口接收的数据包统计信息
 	 * 
@@ -215,19 +254,20 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 		threadPool = context.getServiceImpl(IThreadPoolService.class);
 		linkDiscoveryManager = context.getServiceImpl(ILinkDiscoveryService.class);
 	}
-
 	@Override
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
 		// TODO Auto-generated method stub
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
-		
+		floodlightProvider.addOFSwitchListener(this);
 		//以T=5为周期进行链路权值的更新操作，这个动作时一直都在进行的；
 		newInstanceTask = new SingletonTask(ses, new Runnable(){
 			public void run(){
 				try{
+					log.info("开始计算链路权重");
 					mapTrafficToLinkCost();
 					updateLinkCost();
+					log.info("计算结束");
 				}catch(Exception e){
 					e.printStackTrace();
 				}finally{
@@ -236,7 +276,38 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule {
 			}
 		});
 		newInstanceTask.reschedule(10, TimeUnit.SECONDS);
+	}
 
+	@Override
+	public void switchAdded(long switchId) {
+		this.initialFlag=true;
+		System.out.println("new switch is added!");
+		
+	}
+
+	@Override
+	public void switchRemoved(long switchId) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void switchActivated(long switchId) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void switchPortChanged(long switchId, ImmutablePort port,
+			PortChangeType type) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void switchChanged(long switchId) {
+		// TODO Auto-generated method stub
+		
 	}
 
 

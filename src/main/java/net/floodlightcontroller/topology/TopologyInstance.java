@@ -80,7 +80,10 @@ public class TopologyInstance {
     protected Map<Long, BroadcastTree> destinationRootedTrees;
     protected Map<Long, Set<NodePortTuple>> clusterBroadcastNodePorts;
     protected Map<Long, BroadcastTree> clusterBroadcastTrees;
-
+    
+    // Cost of links
+    protected Map<Link,Integer> linkCost = new HashMap<Link,Integer>();
+    
     protected class PathCacheLoader extends CacheLoader<RouteId, Route> {
         TopologyInstance ti;
         PathCacheLoader(TopologyInstance ti) {
@@ -92,12 +95,13 @@ public class TopologyInstance {
             return ti.buildroute(rid);
         }
     }
-
+    
     // Path cache loader is defined for loading a path when it not present
     // in the cache.
+    
     private final PathCacheLoader pathCacheLoader = new PathCacheLoader(this);
     protected LoadingCache<RouteId, Route> pathcache;
-
+    
     public TopologyInstance() {
         this.switches = new HashSet<Long>();
         this.switchPorts = new HashMap<Long, Set<Short>>();
@@ -107,10 +111,11 @@ public class TopologyInstance {
         this.blockedPorts = new HashSet<NodePortTuple>();
         this.blockedLinks = new HashSet<Link>();
     }
-
+    
     public TopologyInstance(Map<Long, Set<Short>> switchPorts,
                             Map<NodePortTuple, Set<Link>> switchPortLinks,
-                            Set<NodePortTuple> broadcastDomainPorts)
+                            Set<NodePortTuple> broadcastDomainPorts,
+                            Map<Link,Integer> linkCost)
     {
         this.switches = new HashSet<Long>(switchPorts.keySet());
         this.switchPorts = new HashMap<Long, Set<Short>>(switchPorts);
@@ -123,12 +128,15 @@ public class TopologyInstance {
 
         clusters = new HashSet<Cluster>();
         switchClusterMap = new HashMap<Long, Cluster>();
+        
+        this.linkCost=linkCost;
     }
     public TopologyInstance(Map<Long, Set<Short>> switchPorts,
                             Set<NodePortTuple> blockedPorts,
                             Map<NodePortTuple, Set<Link>> switchPortLinks,
                             Set<NodePortTuple> broadcastDomainPorts,
-                            Set<NodePortTuple> tunnelPorts){
+                            Set<NodePortTuple> tunnelPorts,
+                            Map<Link,Integer> linkCost){
 
         // copy these structures
         this.switches = new HashSet<Long>(switchPorts.keySet());
@@ -161,6 +169,8 @@ public class TopologyInstance {
                                     return pathCacheLoader.load(rid);
                                 }
                             });
+        
+        this.linkCost=linkCost;
     }
 
     public void compute() {
@@ -542,17 +552,24 @@ public class TopologyInstance {
         pathcache.invalidateAll();
         destinationRootedTrees.clear();
 
-        Map<Link, Integer> linkCost = new HashMap<Link, Integer>();
         int tunnel_weight = switchPorts.size() + 1;
 
-        for(NodePortTuple npt: tunnelPorts) {
-            if (switchPortLinks.get(npt) == null) continue;
-            for(Link link: switchPortLinks.get(npt)) {
-                if (link == null) continue;
-                linkCost.put(link, tunnel_weight);
+        if(linkCost.keySet() == null){
+        	
+        	for(NodePortTuple npt: tunnelPorts) {
+                if (switchPortLinks.get(npt) == null) continue;
+                for(Link link: switchPortLinks.get(npt)) {
+                    if (link == null) continue;
+                    linkCost.put(link, tunnel_weight);
+                }
             }
+        	
         }
-
+        
+        log.info("----------------------------------------");
+        log.info(linkCost.keySet().size()+"");
+        log.info("-----------------------------------------");
+        
         for(Cluster c: clusters) {
             for (Long node : c.links.keySet()) {
                 BroadcastTree tree = dijkstra(c, node, linkCost, true);

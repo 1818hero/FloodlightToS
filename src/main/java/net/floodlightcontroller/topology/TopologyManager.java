@@ -58,6 +58,7 @@ import net.floodlightcontroller.debugevent.IDebugEventService.EventColumn;
 import net.floodlightcontroller.debugevent.IDebugEventService.EventFieldType;
 import net.floodlightcontroller.debugevent.IDebugEventService.EventType;
 import net.floodlightcontroller.debugevent.IDebugEventService.MaxEventsRegistered;
+import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryListener;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.packet.BSN;
@@ -180,6 +181,8 @@ public class TopologyManager implements
      * Topology Event Updater
      */
     protected IEventUpdater<TopologyEvent> evTopology;
+    
+    private ILinkCostService linkCostManager;
 
     /**
      * Topology Information exposed for a Topology related event - used inside
@@ -847,6 +850,7 @@ public class TopologyManager implements
         restApi = context.getServiceImpl(IRestApiService.class);
         debugCounters = context.getServiceImpl(IDebugCounterService.class);
         debugEvents = context.getServiceImpl(IDebugEventService.class);
+        linkCostManager = context.getServiceImpl(ILinkCostService.class);
 
         switchPorts = new HashMap<Long,Set<Short>>();
         switchPortLinks = new HashMap<NodePortTuple, Set<Link>>();
@@ -1239,7 +1243,8 @@ public class TopologyManager implements
                                                    blockedPorts,
                                                    openflowLinks,
                                                    broadcastDomainPorts,
-                                                   tunnelPorts);
+                                                   tunnelPorts,
+                                                   linkCostManager.getLinkCost());
         nt.compute();
         // We set the instances with and without tunnels to be identical.
         // If needed, we may compute them differently.

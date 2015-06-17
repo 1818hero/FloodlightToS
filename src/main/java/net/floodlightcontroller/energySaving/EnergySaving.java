@@ -563,7 +563,7 @@ public class EnergySaving implements IFloodlightModule {
 		nodePortPairDown = new HashMap<Long,Set<Short>>();        //实例化关闭的交换机端口对
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		initialTime = System.currentTimeMillis();
-		newInstanceTask = new SingletonTask(ses, new Runnable(){
+		/*newInstanceTask = new SingletonTask(ses, new Runnable(){
 			public void run(){
 				try{
 					if(initialFlag){
@@ -584,9 +584,19 @@ public class EnergySaving implements IFloodlightModule {
 						
 				}					
 			}
+		});*/
+		newInstanceTask = new SingletonTask(ses, new Runnable(){
+			public void run(){
+				try{
+					copySwitchLinks();
+					showSwitchLinks();
+				}finally{
+					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
+				}					
+			}
 		});
 		//整个节能模块，在系统完成初始化后的20s后，开始进行节能操作
-		newInstanceTask.reschedule(20, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(5, TimeUnit.SECONDS);
 	}
 
 }
