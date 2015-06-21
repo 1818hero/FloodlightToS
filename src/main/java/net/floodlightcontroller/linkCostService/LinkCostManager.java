@@ -76,7 +76,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 						short portNumber=link.getSrcPort();
 						long dpid1=link.getSrc();
 						Double cost=portUtilization_x10.get(dpid1).get(portNumber);
-						linkCost.put(link,(int)Math.ceil(cost*10));
+						linkCost.put(link,(int)Math.ceil(cost));
 					}
 				}
 			}
@@ -119,7 +119,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 	        	currentPortTraffic[0]=transmitBytes;
 	        	currentPortTraffic[1]=receiveBytes;
 	        	
-	        	if( !initialFlag ){
+	        	if(!initialFlag ){
 	        		
 	        		long transmitByteRate =currentPortTraffic[0]-lastTimePortTraffic.get(dpid).get(portNumber)[0];
 	        		long receiveByteRate = currentPortTraffic[1]-lastTimePortTraffic.get(dpid).get(portNumber)[1];
@@ -139,8 +139,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 	        		}
 	        	    
 	        		//默认设置的链路带宽时100Mbps；
-	        		//double portUtilization_eachPort_x10=(portRate_Mbps/100.0)*10;
-	        	    double portUtilization_eachPort_x10=portRate_Mbps;
+	        		double portUtilization_eachPort_x10=(portRate_Mbps/100.0)*10;
 	        		portUtilizationx10Map.put(portNumber, portUtilization_eachPort_x10);
 	        		
 	        	}
@@ -172,6 +171,16 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 				
 				System.out.println(dpid+" "+ port+ " "+traffic);
 			}
+		}
+	}*/
+	
+	/*public void printLinkCost(){
+		Set<Link> links=linkCost.keySet();
+		Iterator<Link> iter1=links.iterator();
+		while(iter1.hasNext()){
+			Link link=iter1.next();
+			Integer weight=linkCost.get(link);
+			System.out.println(link+" "+weight);
 		}
 	}*/
 	/***
@@ -215,7 +224,6 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 	        
 	        networkTrafficTemp.put(dpid, values);
 		}
-		log.info("-----the operation of collecting traffic from network is done!---");
 		
 		return networkTrafficTemp;
     }

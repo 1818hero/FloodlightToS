@@ -23,11 +23,13 @@ import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 
 public class Mst implements IFloodlightModule {
+	
 	// initial topology of the network
 	private Map<Long,Set<Link>> wholeTopology=null;
 	// minimum spanning tree topology of the network
 	private Map<Long,Set<Link>> mstTopology=null;
 	protected SingletonTask newInstanceTask=null;
+	protected Map<Link,Integer> linkCost=null;
 	
 	// get the linkCost from linkCostManager
 	protected ILinkCostService linkCostManager=null;
@@ -52,6 +54,7 @@ public class Mst implements IFloodlightModule {
 		// TODO Auto-generated method stub
 		return null;
 	}
+	
 	/**
 	 * 产生最小生成树的拓扑
 	 * @param wholeTopology
@@ -63,46 +66,65 @@ public class Mst implements IFloodlightModule {
 		//对最小生成树生成的拓扑进行初始化，最初始时整个只存在节点，而不再存在链路；
 		Set<Long> keySet=wholeTopology.keySet();
 		Iterator<Long> iterator=keySet.iterator();
+		
 		while(iterator.hasNext()){
 			Set<Link> links=new HashSet<Link>();
 			mstTopology.put(iterator.next(), links);
-		}		
+		}
+		
+		//由于交换机的dpid是从1开始的，所以对数组要做特殊处理，整个数组长度+1，并且索引值为0的不使用
 		//整个拓扑中交换机的个数
 		int length=keySet.size();
 		//prim算法所需要的一些变量
-		int[] value=new int[length];
-		boolean[] visited=new boolean[length];
-		int[] parent=new int[length];
+		long[] value=new long[length+1];
+		boolean[] visited=new boolean[length+1];
+		long[] parent=new long[length+1];
 				
-		//将网络中的最小生成树的链路加入下面的Map中；
-		//Map<Long,Set<Link>> switchLinksMST=new HashMap<Long,Set<Link>>();
-				
-		for(int i=0;i<9;i++){
-			value[i]=Integer.MAX_VALUE;
+		for(int i=0;i<length+1;i++){
+			value[i]=Long.MAX_VALUE;
 			visited[i]=false;
 		}
+		
+		//下标为0的索引，为无效的, 将其标为true；
+		visited[0]=true;
+		parent[0]=-1;
+		
 		//选定dpid为0的交换机为根节点
 		//根据网络的流量信息，可以选择根节点为流量最大的节点，需要了解MST中根节点的作用；选择依据；
-		value[0]=0;           
-		parent[0]=-1;
+		
+		value[1]=0;           
+		parent[1]=-1;
 				
-		for(int i=0;i<length-1;i++){
+		for(int i=0;i<length;i++){
 					
 			int switchId=selectSwitch(value,visited);
+			System.out.println(switchId);
 			visited[switchId]=true;
-					
-			Set<Link> links=wholeTopology.get(switchId);
+			Long id=new Long(switchId);
+			Set<Link> links=wholeTopology.get(id);
 			Iterator<Link> iterator2=links.iterator();
 					
 			while(iterator2.hasNext()){
 				Link link=iterator2.next();
+				
+				if(!linkCost.containsKey(link)){
+					linkCost.put(link, 1);     //当linkCost中不包含link时，就设置为默认值1；
+				}
 				if(!visited[(int)link.getDst()] && linkCost.get(link)<value[(int)link.getDst()]){
 					value[(int)link.getDst()]=linkCost.get(link);
 					parent[(int)link.getDst()]=switchId;
 				}
 			}
-		}		
-		for(int i=1;i < parent.length;i++){
+		}
+		
+		/*for(Long node:parent){
+			System.out.print(node);
+			System.out.print(" ");
+		}
+		System.out.println();*/
+		
+		//
+		for(int i=2;i < parent.length;i++){
 			Link link=selectLink(wholeTopology,parent[i],i);
 			mstTopology.get(link.getSrc()).add(link);
 			Link link2=selectLink(wholeTopology,i,parent[i]);
@@ -125,14 +147,15 @@ public class Mst implements IFloodlightModule {
 		return mstTopology;
 	}
 	/**
-	 * 选择链路权重最小的节点
+	 * 选择链路权重最小的节点，并且该节点未被选中过
 	 * @param value
 	 * @param visited
 	 * @return
 	 */
-	public int selectSwitch(int[] value,boolean[] visited){
+	public int selectSwitch(long[] value,boolean[] visited){
 		int length=value.length;
-		int min_index=0,minValue=Integer.MAX_VALUE;
+		int min_index=1;
+		long minValue=Long.MAX_VALUE;
 		for(int i=0;i<length;i++){
 			if(value[i]< minValue && !visited[i]){
 				min_index=i;
@@ -149,8 +172,8 @@ public class Mst implements IFloodlightModule {
 	 * @return 
 	 */
 	public Link selectLink(Map<Long,Set<Link>> wholeTopology,long src,long dst){
-		
-		Set<Link> links=wholeTopology.get(src);
+		Long srcId=new Long(src);
+		Set<Link> links=wholeTopology.get(srcId);
 		Iterator<Link> iterator=links.iterator();
 		while(iterator.hasNext()){
 			Link link=iterator.next();
@@ -185,6 +208,18 @@ public class Mst implements IFloodlightModule {
 			wholeTopology.put(key, srcLink);
 			
 		}
+		
+		/*Set<Long> dpids=wholeTopology.keySet();
+		Iterator<Long> iter3=keys.iterator();
+		while(iter3.hasNext()){
+			long dpid=iter3.next();
+			Set<Link> links=wholeTopology.get(dpid);
+			Iterator<Link> iter4=links.iterator();
+			while(iter4.hasNext()){
+				Link link=iter4.next();
+				System.out.println(link);
+			}
+		}*/
 	}
 
 	@Override
@@ -202,11 +237,14 @@ public class Mst implements IFloodlightModule {
 		// TODO Auto-generated method stub
 		wholeTopology=new HashMap<Long,Set<Link>>();
 		mstTopology=new HashMap<Long,Set<Link>>();
+		
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable(){
 			public void run(){
 				try{
+					linkCost=linkCostManager.getLinkCost();
 					copySwitchLinks();
+					generateMstTopology(wholeTopology,linkCost);
 				}finally{
 					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 				}					
