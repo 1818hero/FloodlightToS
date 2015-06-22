@@ -63,9 +63,14 @@ public class Mst implements IFloodlightModule {
 	 */
 	public Map<Long,Set<Link>> generateMstTopology(Map<Long,Set<Link>> wholeTopology,Map<Link,Integer> linkCost){
 		
+		
 		//对最小生成树生成的拓扑进行初始化，最初始时整个只存在节点，而不再存在链路；
 		Set<Long> keySet=wholeTopology.keySet();
 		Iterator<Long> iterator=keySet.iterator();
+		
+		if(keySet.isEmpty()){   //若没有连接mininet，则做返回处理；
+			return null;
+		}
 		
 		while(iterator.hasNext()){
 			Set<Link> links=new HashSet<Link>();
