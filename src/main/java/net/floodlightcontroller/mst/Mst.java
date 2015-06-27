@@ -9,9 +9,15 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.openflow.protocol.OFPhysicalPort;
+import org.openflow.protocol.OFPortMod;
+import org.openflow.protocol.OFType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.floodlightcontroller.core.IFloodlightProviderService;
+import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.ImmutablePort;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
@@ -28,10 +34,14 @@ public class Mst implements IFloodlightModule {
 	private Map<Long,Set<Link>> wholeTopology=null;
 	// minimum spanning tree topology of the network
 	private Map<Long,Set<Link>> mstTopology=null;
+	
+	private Map<Long,Set<Link>> downLinksTopology=null;
+	
 	protected SingletonTask newInstanceTask=null;
 	protected Map<Link,Integer> linkCost=null;
 	
 	// get the linkCost from linkCostManager
+	protected IFloodlightProviderService floodlightProvider=null;
 	protected ILinkCostService linkCostManager=null;
 	protected ILinkDiscoveryService linkDiscoveryManager=null;
 	protected static Logger log=LoggerFactory.getLogger(Mst.class);
@@ -54,7 +64,126 @@ public class Mst implements IFloodlightModule {
 		// TODO Auto-generated method stub
 		return null;
 	}
-	
+	/**
+	 * 
+	 * 测试用，打印链路输出
+	 * @param switchLinks
+	 */
+	public void printSwitchLinks(Map<Long,Set<Link>> switchLinks){
+		
+		int count=1;
+		Set<Long> keySet=switchLinks.keySet();
+		Iterator<Long> iterator1=keySet.iterator();
+		while(iterator1.hasNext()){
+			Long id=iterator1.next();
+			Set<Link> links=switchLinks.get(id);
+			Iterator<Link> iterator2=links.iterator();
+			while(iterator2.hasNext()){
+				Link link=iterator2.next();
+				System.out.println((count++)+" "+link);
+			}
+		}
+		
+	}
+	/**
+	 * 将多条链路关闭
+	 * @param downLinks
+	 */
+	public void doDownLinkOperation(Map<Long,Set<Link>> downLinks){
+		try{
+			Set<Long> keys=downLinks.keySet();
+			Iterator<Long> iteratorKeys=keys.iterator();
+			while(iteratorKeys.hasNext()){
+				Long dpid= iteratorKeys.next();
+				IOFSwitch ofs=floodlightProvider.getAllSwitchMap().get(dpid);
+				Set<Link> links=downLinks.get(dpid);
+				Iterator<Link> iteratorLinks=links.iterator();
+				while(iteratorLinks.hasNext()){
+					Link link=iteratorLinks.next();
+					setLinkDown(ofs,link);
+				}
+			}
+		}catch(Exception e){
+			log.info(" 没有要关闭的链路 ");
+		}
+	}
+	/**
+	 * 关闭指定的链路
+	 * @param ofs
+	 * @param link
+	 * @return
+	 */
+	public boolean setLinkDown(IOFSwitch ofs,Link link){
+		short portNumber = link.getSrcPort();
+		if(setPortDown(ofs,portNumber)){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	/***
+	 *  将指定的交换机端口关闭 
+	 */
+	public boolean setPortDown(IOFSwitch ofs,short portNumber){
+		           
+		//获得OpenFlow交换机的某个端口的物理地址
+		ImmutablePort ofpPort = ofs.getPort(portNumber);
+		if(ofpPort==null)
+			return false;
+		if(portNumber==-2)
+			return false;
+		byte[] macAddress=ofpPort.getHardwareAddress();
+		//定义OFPortMod命令
+		OFPortMod mymod=(OFPortMod)floodlightProvider.getOFMessageFactory().getMessage(OFType.PORT_MOD);
+		//设置OFPortMod命令的相关参数
+		mymod.setPortNumber(portNumber); 
+		//mymod.setConfig(0); 开启某个端口
+		mymod.setConfig(OFPhysicalPort.OFPortConfig.OFPPC_PORT_DOWN.getValue());
+		mymod.setHardwareAddress(macAddress);
+		mymod.setMask(0xffffffff);
+		
+		//将OFPortMod命令发送到指定的交换机中，进行执行！
+		try{
+			ofs.write(mymod,null);
+			ofs.flush();
+		}catch(Exception e){		
+			log.info("PortDown Failed");
+		}	
+		return true;
+	}
+	/**
+	 * 寻找要关闭的网络链路；
+	 * @param wholeTopology
+	 * @param mstTopology
+	 * @return
+	 */
+	public Map<Long,Set<Link>> findDownLink(Map<Long,Set<Link>> wholeTopology,Map<Long,Set<Link>> mstTopology){
+		
+		Map<Long,Set<Link>> downLinksAll=new HashMap<Long,Set<Link>>();
+		Set<Long> allKeys=wholeTopology.keySet();
+		Iterator<Long> iterator1=allKeys.iterator();
+		while(iterator1.hasNext()){
+			Long dpid=iterator1.next();
+			Set<Link> links=wholeTopology.get(dpid);
+			Iterator<Link> iterator2=links.iterator();
+			while(iterator2.hasNext()){
+				Link link=iterator2.next();
+				if(!mstTopology.get(dpid).contains(link)){
+					Set<Link> downLinksByDpid1=downLinksAll.get(dpid);
+					if(downLinksByDpid1 == null ){   //如果已存在，则直接将该链路加入其中，否则需要new出一个hashSet；
+						HashSet<Link> downLinksByDpid2=new HashSet<Link>();
+						downLinksByDpid2.add(link);
+						downLinksAll.put(dpid, downLinksByDpid2);
+					}else{
+						downLinksByDpid1.add(link);
+					}
+				}
+				
+			}
+		}
+		return downLinksAll;
+		
+	}
 	/**
 	 * 产生最小生成树的拓扑
 	 * @param wholeTopology
@@ -128,27 +257,12 @@ public class Mst implements IFloodlightModule {
 		}
 		System.out.println();*/
 		
-		//
 		for(int i=2;i < parent.length;i++){
 			Link link=selectLink(wholeTopology,parent[i],i);
 			mstTopology.get(link.getSrc()).add(link);
 			Link link2=selectLink(wholeTopology,i,parent[i]);
 			mstTopology.get(link2.getSrc()).add(link2);
-		}
-		
-		//打印输出，非算法必须
-		Set<Long> keySet2=mstTopology.keySet();
-		Iterator<Long> iterator3 = keySet2.iterator();
-		int i=1;
-		while(iterator3.hasNext()){
-			Long id=iterator3.next();
-			Set<Link> links=mstTopology.get(id);
-			Iterator<Link> iterator4=links.iterator();
-			while(iterator4.hasNext()){
-				System.out.println((i++)+" "+id+" "+iterator4.next());
-			}
-		}
-				
+		}		
 		return mstTopology;
 	}
 	/**
@@ -231,6 +345,7 @@ public class Mst implements IFloodlightModule {
 	public void init(FloodlightModuleContext context)
 			throws FloodlightModuleException {
 		// TODO Auto-generated method stub
+		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		linkCostManager=context.getServiceImpl(ILinkCostService.class);
 		linkDiscoveryManager=context.getServiceImpl(ILinkDiscoveryService.class);
 		threadPool = context.getServiceImpl(IThreadPoolService.class);
@@ -249,7 +364,13 @@ public class Mst implements IFloodlightModule {
 				try{
 					linkCost=linkCostManager.getLinkCost();
 					copySwitchLinks();
-					generateMstTopology(wholeTopology,linkCost);
+					mstTopology=generateMstTopology(wholeTopology,linkCost);
+					System.out.println("---------------------mstTopology-----------");
+					printSwitchLinks(mstTopology);
+					System.out.println("---------------------downLinks-----------");
+					downLinksTopology=findDownLink(wholeTopology,mstTopology);
+					doDownLinkOperation(downLinksTopology);
+					log.info("最小生成树拓扑生成");
 				}finally{
 					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 				}					
