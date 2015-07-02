@@ -155,34 +155,6 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,IOFS
 		initialFlag=initialFlag?false:true;
 		
 	}
-	/*public void print(){
-		
-		Set<Long> dpids=portUtilization_x10.keySet();
-		
-		Iterator<Long> iteratorDpid= dpids.iterator();
-		while(iteratorDpid.hasNext()){
-			long dpid=iteratorDpid.next();
-			Map<Short,Double> portTraffic=portUtilization_x10.get(dpid);
-			Set<Short> portId=portTraffic.keySet();
-			Iterator<Short> iteratorPort = portId.iterator();
-			while(iteratorPort.hasNext()){
-				short port=iteratorPort.next();
-				double traffic=portTraffic.get(port);
-				
-				System.out.println(dpid+" "+ port+ " "+traffic);
-			}
-		}
-	}*/
-	
-	/*public void printLinkCost(){
-		Set<Link> links=linkCost.keySet();
-		Iterator<Link> iter1=links.iterator();
-		while(iter1.hasNext()){
-			Link link=iter1.next();
-			Integer weight=linkCost.get(link);
-			System.out.println(link+" "+weight);
-		}
-	}*/
 	/***
 	 * 获取交换机各个端口接收的数据包统计信息
 	 * 
