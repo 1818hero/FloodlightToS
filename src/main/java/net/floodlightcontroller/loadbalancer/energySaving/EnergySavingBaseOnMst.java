@@ -1,6 +1,7 @@
 package net.floodlightcontroller.loadbalancer.energySaving;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -41,11 +42,12 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	// 网络的完整拓扑（网络节能前）
 	private Map<Long, Set<Link>> wholeTopology;
 	private Map<Long, Set<Link>> currentTopology;
+	private int linkNumber;
 	// 链路权重
 	private Map<Link, Integer> linkCost;
 	private Link maxWeightLink = null;
 	private Integer maxWeight = 0;
-	private Integer threshold = 95;
+	private Integer threshold = 8;
 
 	/**
 	 * 周期性的检测网络链路权重，返回链路权重大于设定阈值的链路
@@ -64,11 +66,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		while (iteratorLinks.hasNext()) {
 			Link link = iteratorLinks.next();
 			Integer weight = linkCost.get(link);
+			log.info("link {},weight {}", new Object[]{link,weight});
 			if (weight >= maxWeight) {
-				weight = maxWeight;
+				maxWeight = weight;
 				maxWeightLink = link;
 			}
 		}
+		log.info("maxWeight {},link {}", new Object[]{maxWeight,maxWeightLink});
 		if (maxWeight > threshold) {
 			return maxWeightLink;
 		}
@@ -153,8 +157,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			while (iter2.hasNext()) {
 				Link link = new Link();
 				link = iter2.next();
-				if (key == link.getSrc()) {
+				if ( key == link.getSrc() ) {
 					srcLink.add(link);
+					linkNumber++;
 				}
 			}
 			currentTopology.put(key, srcLink);
@@ -166,6 +171,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		long dpid = link.getSrc();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
 		if (setPortUp(ofs, portNumber)) {
+			log.info("link {} up", link);
 			return true;
 		}
 		return false;
@@ -193,7 +199,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			ofs.write(mymod, null);
 			ofs.flush();
 		} catch (Exception e) {
-			log.info("PortUp Failed");
+			log.error("link down fail");
 		}
 		return true;
 	}
@@ -231,7 +237,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	@Override
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
-
+		currentTopology=new HashMap<Long,Set<Link>>();
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
@@ -243,13 +249,17 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					if (overloadLink != null) {
 						Link loopLink = findLoopLinkInTopology(wholeTopology,
 								currentTopology, overloadLink);
+						log.info("link {}", loopLink);  
 						if (loopLink != null) {
 							setLinkUp(loopLink);
 						}
 					}
+					log.info("linkNUmber {}",linkNumber);
+					linkNumber=0;
 				} catch (Exception e) {
 					e.printStackTrace();
-				} finally {
+				} finally{
+					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 				}
 			}
 		});
