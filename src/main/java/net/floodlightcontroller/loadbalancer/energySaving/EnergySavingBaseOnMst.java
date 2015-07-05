@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -80,65 +81,106 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	}
 
 	/**
-	 * 返回过载链路的替代链路
-	 * 
+	 * 返回拥塞链路的环装替代链路，该方法假设拥塞链路是无向链路
 	 * @param wholeTopology
 	 * @param currentTopology
 	 * @param overloadLink
 	 * @return
 	 */
-	public Link findLoopLinkInTopology(Map<Long, Set<Link>> wholeTopology,
-			Map<Long, Set<Link>> currentTopology, Link overloadLink) {
-		// 由于链路都是双向的链路，所以需要判断两次，正向链路和反向链路，而方向时相对的；
-
-		Long dst = overloadLink.getDst(); // 得到超过链路利用率的链路的目的节点；
-		Set<Link> links = currentTopology.get(dst);
-		Iterator<Link> iteratorLinks = links.iterator();
-		while (iteratorLinks.hasNext()) {
-			Link link = iteratorLinks.next();
-			Long dst2 = link.getDst();
-			Link link2 = selectLink(wholeTopology, overloadLink.getSrc(), dst2);
-			if (link2 != null) {
-				return link2;
-			}
+	public Link getLoopLinkNonBaseDirected(Link overloadLink,
+			Map<Long, Set<Link>> wholeTopology, Map<Long, Set<Link>> currentTopology){
+		Link selectedLink = getLoopLinkBaseDirected(overloadLink,wholeTopology,currentTopology);
+		if( selectedLink == null ){
+			Link link=findSelectedLink(wholeTopology,overloadLink.getDst(),overloadLink.getSrc());
+			return getLoopLinkBaseDirected(link,wholeTopology,currentTopology);
+		}else{
+			return selectedLink;
 		}
+	}
+	/**
+	 * 返回拥塞链路的环装替代链路，该方法假设拥塞链路是有向链路
+	 * @param overloadLink
+	 * @param wholeTopology
+	 * @param currentTopology
+	 * @return
+	 */
+	public Link getLoopLinkBaseDirected(Link overloadLink,
+			Map<Long, Set<Link>> wholeTopology, Map<Long, Set<Link>> currentTopology) {
 
-		Long src = overloadLink.getSrc(); // 得到超过链路利用率的链路的目的节点；
-		Set<Link> links2 = currentTopology.get(src);
-		Iterator<Link> iteratorLinks2 = links2.iterator();
-		while (iteratorLinks2.hasNext()) {
-			Link link = iteratorLinks2.next();
-			Long dst3 = link.getDst();
-			Link link3 = selectLink(wholeTopology, overloadLink.getDst(), dst3);
-			if (link3 != null) {
-				return link3;
+		int count = currentTopology.size();
+		if (overloadLink == null) {
+			return null;
+		}
+		long src = overloadLink.getSrc();
+		long dst = overloadLink.getDst();
+		boolean[] visited = new boolean[count + 1];
+		for (int i = 0; i <= count; i++) {
+			visited[i] = false;
+		}
+		PriorityBlockingQueue<Long> queue = new PriorityBlockingQueue<Long>();
+		queue.add(dst);
+		Link tempLink = null;
+		Link selectedLink = null;
+		while (!queue.isEmpty()) {
+			long dpid = queue.poll();
+			Set<Link> links = currentTopology.get(dpid);
+			Iterator<Link> iter = links.iterator();
+			while (iter.hasNext()) {
+				tempLink = iter.next();
+				long tempDst = tempLink.getDst();
+				if (generalLinkEquals(tempLink, overloadLink)) {
+					continue;
+				}
+				selectedLink = findSelectedLink(wholeTopology,tempDst,src);
+				if( selectedLink != null ){
+					if(!this.generalLinkEquals(overloadLink, selectedLink)){
+						return selectedLink;
+					}
+				}
+				if (!visited[(int)tempDst]) {
+					visited[(int)tempDst] = true;
+					queue.add(tempDst);
+				}
 			}
 		}
 		return null;
 	}
-
 	/**
-	 * 根据指定的源节点和目的节点，寻找处对应的链路
-	 * 
-	 * @param switchLinks
+	 * 从给定拓扑中找到一条和指定源节点、目的节点一致的链路
+	 * @param wholeTopology
 	 * @param src
 	 * @param dst
 	 * @return
 	 */
-	public Link selectLink(Map<Long, Set<Link>> wholeTopology, long src,
-			long dst) {
-		Long srcId = new Long(src);
-		Set<Link> links = wholeTopology.get(srcId);
-		Iterator<Link> iterator = links.iterator();
-		while (iterator.hasNext()) {
-			Link link = iterator.next();
-			if (link.getSrc() == src && link.getDst() == dst) {
+	public Link findSelectedLink(Map<Long,Set<Link>> wholeTopology,long src,long dst){
+		Set<Link> links=wholeTopology.get(src);
+		Iterator<Link> iterator=links.iterator();
+		while(iterator.hasNext()){
+			Link link=iterator.next();
+			if(link.getDst()==dst){
 				return link;
 			}
 		}
 		return null;
 	}
-
+	/**
+	 * 判断两条有向链路是否隶属于同一条无向链路，供getLoopLinkBaseDirected使用
+	 * @param link1
+	 * @param link2
+	 * @return
+	 */
+	public boolean generalLinkEquals(Link link1, Link link2) {
+		long src=link1.getSrc();
+		short srcPort=link1.getSrcPort();
+		long dst=link1.getDst();
+		short dstPort=link1.getDstPort();
+		Link reverseLink=new Link(dst,dstPort,src,srcPort);
+		if (link1.equals(link2)
+				|| reverseLink.equals(link2)) {
+			return true;
+		}
+		return false;
+	}
 	/**
 	 * 完成对网络拓扑信息的复制, 将网络的初始拓扑保存下来
 	 */
@@ -247,8 +289,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					linkCost = linkCostService.getLinkCost();
 					Link overloadLink = detectLinkWeight(linkCost);
 					if (overloadLink != null) {
-						Link loopLink = findLoopLinkInTopology(wholeTopology,
-								currentTopology, overloadLink);
+						Link loopLink = getLoopLinkNonBaseDirected(overloadLink,wholeTopology,
+								currentTopology);
 						log.info("link {}", loopLink);  
 						if (loopLink != null) {
 							setLinkUp(loopLink);

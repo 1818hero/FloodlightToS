@@ -442,13 +442,10 @@ public class EnergySaving implements IFloodlightModule {
 		long destination;
 		Link link;
 		while(!queue.isEmpty()){
-			
 			src=queue.poll();
-			
 			Set<Link> links=copySwitchLinks.get(src);
 			Iterator<Link> iter=links.iterator();   //空指针指向异常
 			while(iter.hasNext()){
-				
 				link=iter.next();
 				destination=link.getDst();
 				if(destination==dst){
