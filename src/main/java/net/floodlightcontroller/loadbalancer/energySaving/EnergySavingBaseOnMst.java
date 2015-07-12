@@ -229,8 +229,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	}
 
 	public boolean setLinkUp(Link link) {
-		short portNumber = link.getSrcPort();
-		long dpid = link.getSrc();
+		short portNumber = link.getDstPort();
+		long dpid = link.getDst();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
 		if (setPortUp(ofs, portNumber)) {
 			log.info("EnergySavingBaseOnMst.setLinkUp {} up", link);
@@ -261,7 +261,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			ofs.write(mymod, null);
 			ofs.flush();
 		} catch (Exception e) {
-			log.error("link down fail");
+			log.error("link up fail");
 		}
 		return true;
 	}
