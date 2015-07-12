@@ -10,8 +10,12 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.openflow.protocol.OFFlowMod;
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPortMod;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.Wildcards;
+import org.openflow.protocol.Wildcards.Flag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +30,8 @@ import net.floodlightcontroller.core.util.SingletonTask;
 import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.mst.Mst;
+import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 
@@ -35,6 +41,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private IFloodlightProviderService floodlightProvider;
 	private IThreadPoolService threadPool;
 	private ILinkDiscoveryService linkDiscoveryManager;
+	private IRoutingService routingService;
 	private Mst mst;
 	private ILinkCostService linkCostService;
 	private SingletonTask newInstanceTask;
@@ -67,13 +74,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		while (iteratorLinks.hasNext()) {
 			Link link = iteratorLinks.next();
 			Integer weight = linkCost.get(link);
-			log.info("link {},weight {}", new Object[]{link,weight});
 			if (weight >= maxWeight) {
 				maxWeight = weight;
 				maxWeightLink = link;
 			}
 		}
-		log.info("maxWeight {},link {}", new Object[]{maxWeight,maxWeightLink});
+		log.info("maxWeight {},link {}", new Object[] { maxWeight,
+				maxWeightLink });
 		if (maxWeight > threshold) {
 			return maxWeightLink;
 		}
@@ -82,30 +89,37 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 
 	/**
 	 * 返回拥塞链路的环装替代链路，该方法假设拥塞链路是无向链路
+	 * 
 	 * @param wholeTopology
 	 * @param currentTopology
 	 * @param overloadLink
 	 * @return
 	 */
 	public Link getLoopLinkNonBaseDirected(Link overloadLink,
-			Map<Long, Set<Link>> wholeTopology, Map<Long, Set<Link>> currentTopology){
-		Link selectedLink = getLoopLinkBaseDirected(overloadLink,wholeTopology,currentTopology);
-		if( selectedLink == null ){
-			Link link=findSelectedLink(wholeTopology,overloadLink.getDst(),overloadLink.getSrc());
-			return getLoopLinkBaseDirected(link,wholeTopology,currentTopology);
-		}else{
+			Map<Long, Set<Link>> wholeTopology,
+			Map<Long, Set<Link>> currentTopology) {
+		Link selectedLink = getLoopLinkBaseDirected(overloadLink,
+				wholeTopology, currentTopology);
+		if (selectedLink == null) {
+			Link link = findSelectedLink(wholeTopology, overloadLink.getDst(),
+					overloadLink.getSrc());
+			return getLoopLinkBaseDirected(link, wholeTopology, currentTopology);
+		} else {
 			return selectedLink;
 		}
 	}
+
 	/**
 	 * 返回拥塞链路的环装替代链路，该方法假设拥塞链路是有向链路
+	 * 
 	 * @param overloadLink
 	 * @param wholeTopology
 	 * @param currentTopology
 	 * @return
 	 */
 	public Link getLoopLinkBaseDirected(Link overloadLink,
-			Map<Long, Set<Link>> wholeTopology, Map<Long, Set<Link>> currentTopology) {
+			Map<Long, Set<Link>> wholeTopology,
+			Map<Long, Set<Link>> currentTopology) {
 
 		int count = currentTopology.size();
 		if (overloadLink == null) {
@@ -131,67 +145,71 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				if (generalLinkEquals(tempLink, overloadLink)) {
 					continue;
 				}
-				selectedLink = findSelectedLink(wholeTopology,tempDst,src);
-				if( selectedLink != null ){
-					if(!this.generalLinkEquals(overloadLink, selectedLink)){
+				selectedLink = findSelectedLink(wholeTopology, tempDst, src);
+				if (selectedLink != null) {
+					if (!this.generalLinkEquals(overloadLink, selectedLink)) {
 						return selectedLink;
 					}
 				}
-				if (!visited[(int)tempDst]) {
-					visited[(int)tempDst] = true;
+				if (!visited[(int) tempDst]) {
+					visited[(int) tempDst] = true;
 					queue.add(tempDst);
 				}
 			}
 		}
 		return null;
 	}
+
 	/**
 	 * 从给定拓扑中找到一条和指定源节点、目的节点一致的链路
+	 * 
 	 * @param wholeTopology
 	 * @param src
 	 * @param dst
 	 * @return
 	 */
-	public Link findSelectedLink(Map<Long,Set<Link>> wholeTopology,long src,long dst){
-		Set<Link> links=wholeTopology.get(src);
-		Iterator<Link> iterator=links.iterator();
-		while(iterator.hasNext()){
-			Link link=iterator.next();
-			if(link.getDst()==dst){
+	public Link findSelectedLink(Map<Long, Set<Link>> wholeTopology, long src,
+			long dst) {
+		Set<Link> links = wholeTopology.get(src);
+		Iterator<Link> iterator = links.iterator();
+		while (iterator.hasNext()) {
+			Link link = iterator.next();
+			if (link.getDst() == dst) {
 				return link;
 			}
 		}
 		return null;
 	}
+
 	/**
 	 * 判断两条有向链路是否隶属于同一条无向链路，供getLoopLinkBaseDirected使用
+	 * 
 	 * @param link1
 	 * @param link2
 	 * @return
 	 */
 	public boolean generalLinkEquals(Link link1, Link link2) {
-		long src=link1.getSrc();
-		short srcPort=link1.getSrcPort();
-		long dst=link1.getDst();
-		short dstPort=link1.getDstPort();
-		Link reverseLink=new Link(dst,dstPort,src,srcPort);
-		if (link1.equals(link2)
-				|| reverseLink.equals(link2)) {
+		long src = link1.getSrc();
+		short srcPort = link1.getSrcPort();
+		long dst = link1.getDst();
+		short dstPort = link1.getDstPort();
+		Link reverseLink = new Link(dst, dstPort, src, srcPort);
+		if (link1.equals(link2) || reverseLink.equals(link2)) {
 			return true;
 		}
 		return false;
 	}
+
 	/**
 	 * 完成对网络拓扑信息的复制, 将网络的初始拓扑保存下来
 	 */
 	public void copySwitchLinks() {
-
+		linkNumber = 0; // 重新对linkNumber进行赋值，故对其做初始化操作；
 		Map<Long, Set<Link>> switchLinks = linkDiscoveryManager
 				.getSwitchLinks();
 		Set<Long> keys = switchLinks.keySet();
 		Iterator<Long> iter1 = keys.iterator();
 		while (iter1.hasNext()) {
-
 			Long key = iter1.next();
 			Set<Link> links = switchLinks.get(key);
 			Set<Link> srcLink = new HashSet<Link>();
@@ -199,13 +217,14 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			while (iter2.hasNext()) {
 				Link link = new Link();
 				link = iter2.next();
-				if ( key == link.getSrc() ) {
+				if (key == link.getSrc()) {
 					srcLink.add(link);
 					linkNumber++;
 				}
 			}
 			currentTopology.put(key, srcLink);
 		}
+		log.info("EnergySavingBaseOnMst.copySwitchLinks linkNumber {}",linkNumber);
 	}
 
 	public boolean setLinkUp(Link link) {
@@ -213,7 +232,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		long dpid = link.getSrc();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
 		if (setPortUp(ofs, portNumber)) {
-			log.info("link {} up", link);
+			log.info("EnergySavingBaseOnMst.setLinkUp {} up", link);
 			return true;
 		}
 		return false;
@@ -246,6 +265,27 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		return true;
 	}
 
+	public void deleteFlowEntry(long dpid, short portNumber) {
+		IOFSwitch sw=floodlightProvider.getSwitch(dpid);
+		OFMatch match = new OFMatch();
+		match.setWildcards(Wildcards.FULL.matchOn(Flag.TP_DST));
+		match.setNetworkProtocol(IPv4.PROTOCOL_UDP);
+		match.setTransportDestination((short) 5001);
+		OFFlowMod ofFlowMod = (OFFlowMod) floodlightProvider
+				.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
+		ofFlowMod.setMatch(match);
+		ofFlowMod.setCommand(OFFlowMod.OFPFC_DELETE);
+		ofFlowMod.setOutPort(portNumber);
+
+		try {
+			sw.write(ofFlowMod, null);
+			sw.flush();
+			log.info("EnergySavingBaseOnMst.deleteFlowEntry Dpid{} portNumber{}",new Object[]{sw.getId(),portNumber});
+		} catch (Exception e) {
+			log.info("EnergySavingBaseOnMst.deleteFlowEntry error Dpid{} portNumber{}",new Object[]{sw.getId(),portNumber});
+		}
+	}
+
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		// TODO Auto-generated method stub
@@ -274,12 +314,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		linkCostService = context.getServiceImpl(ILinkCostService.class);
 		linkDiscoveryManager = context
 				.getServiceImpl(ILinkDiscoveryService.class);
+		routingService=context.getServiceImpl(IRoutingService.class);
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
-		currentTopology=new HashMap<Long,Set<Link>>();
+		currentTopology = new HashMap<Long, Set<Link>>();
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
@@ -289,18 +330,18 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					linkCost = linkCostService.getLinkCost();
 					Link overloadLink = detectLinkWeight(linkCost);
 					if (overloadLink != null) {
-						Link loopLink = getLoopLinkNonBaseDirected(overloadLink,wholeTopology,
-								currentTopology);
-						log.info("link {}", loopLink);  
+						Link loopLink = getLoopLinkNonBaseDirected(
+								overloadLink, wholeTopology, currentTopology);
 						if (loopLink != null) {
+							deleteFlowEntry(overloadLink.getSrc(),overloadLink.getSrcPort());
+							log.info("LoopLink {}",loopLink);
 							setLinkUp(loopLink);
 						}
 					}
-					log.info("linkNUmber {}",linkNumber);
-					linkNumber=0;
+					//log.info("route {}",routingService.getRoute(1, 4, 0));
 				} catch (Exception e) {
 					e.printStackTrace();
-				} finally{
+				} finally {
 					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 				}
 			}
