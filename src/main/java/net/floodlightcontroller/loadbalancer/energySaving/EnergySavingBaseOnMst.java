@@ -41,7 +41,6 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private IFloodlightProviderService floodlightProvider;
 	private IThreadPoolService threadPool;
 	private ILinkDiscoveryService linkDiscoveryManager;
-	private IRoutingService routingService;
 	private Mst mst;
 	private ILinkCostService linkCostService;
 	private SingletonTask newInstanceTask;
@@ -51,6 +50,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private Map<Long, Set<Link>> wholeTopology;
 	private Map<Long, Set<Link>> currentTopology;
 	private int linkNumber;
+	private Set<Link> overloadLinks=null;
 	// 链路权重
 	private Map<Link, Integer> linkCost;
 	private Link maxWeightLink = null;
@@ -68,13 +68,12 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		// 周期检测链路权重，周期开始时总是将下列值初始化为null和0
 		maxWeightLink = null;
 		maxWeight = 0;
-
 		Set<Link> links = linkCost.keySet();
 		Iterator<Link> iteratorLinks = links.iterator();
 		while (iteratorLinks.hasNext()) {
 			Link link = iteratorLinks.next();
 			Integer weight = linkCost.get(link);
-			if (weight >= maxWeight) {
+			if ((weight >= maxWeight) && !overloadLinks.contains(link)) {
 				maxWeight = weight;
 				maxWeightLink = link;
 			}
@@ -82,6 +81,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		log.info("maxWeight {},link {}", new Object[] { maxWeight,
 				maxWeightLink });
 		if (maxWeight > threshold) {
+			overloadLinks.add(maxWeightLink);
 			return maxWeightLink;
 		}
 		return null;
@@ -232,7 +232,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		short portNumber = link.getDstPort();
 		long dpid = link.getDst();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
-		if (setPortUp(ofs, portNumber)) {
+		if (setPortUp(ofs, portNumber) & setPortUp(floodlightProvider.getSwitch(link.getSrc()),link.getSrcPort())) {
 			log.info("EnergySavingBaseOnMst.setLinkUp {} up", link);
 			return true;
 		}
@@ -243,8 +243,6 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		// 获得OpenFlow交换机的某个端口的物理地址
 		ImmutablePort ofpPort = ofs.getPort(portNumber);
 		if (ofpPort == null)
-			return false;
-		if (portNumber == -2)
 			return false;
 		byte[] macAddress = ofpPort.getHardwareAddress();
 		// 定义OFPortMod命令
@@ -262,6 +260,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			ofs.flush();
 		} catch (Exception e) {
 			log.error("link up fail");
+			return false;
 		}
 		return true;
 	}
@@ -282,11 +281,11 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			sw.write(ofFlowMod, null);
 			sw.flush();
 			log.info(
-					"EnergySavingBaseOnMst.deleteFlowEntry Dpid {} portNumber {}",
+					"EnergySavingBaseOnMst.deleteFlowEntry Dpid: {} portNumber: {}",
 					new Object[] { sw.getId(), portNumber });
 		} catch (Exception e) {
 			log.error(
-					"EnergySavingBaseOnMst.deleteFlowEntry error Dpid {} portNumber {}",
+					"EnergySavingBaseOnMst.deleteFlowEntry error Dpid: {} portNumber: {}",
 					new Object[] { sw.getId(), portNumber });
 		}
 	}
@@ -326,6 +325,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
 		currentTopology = new HashMap<Long, Set<Link>>();
+		overloadLinks=new HashSet<Link>();
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
@@ -339,11 +339,14 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 								overloadLink, wholeTopology, currentTopology);
 						if (loopLink != null) {
 							log.info("LoopLink {}", loopLink);
-							setLinkUp(loopLink);
-							deleteFlowEntry(overloadLink.getSrc(),
-									overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
-							deleteFlowEntry(overloadLink.getDst(),
-									overloadLink.getDstPort());
+							if (setLinkUp(loopLink)) {
+								log.info("link up success");
+								deleteFlowEntry(overloadLink.getSrc(),
+										overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+								deleteFlowEntry(overloadLink.getDst(),
+										overloadLink.getDstPort());
+							}
+
 						}
 					}
 					// log.info("route {}",routingService.getRoute(1, 4, 0));
