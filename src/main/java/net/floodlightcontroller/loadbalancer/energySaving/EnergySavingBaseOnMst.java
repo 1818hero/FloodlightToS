@@ -224,7 +224,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			}
 			currentTopology.put(key, srcLink);
 		}
-		log.info("EnergySavingBaseOnMst.copySwitchLinks linkNumber {}",linkNumber);
+		log.info("EnergySavingBaseOnMst.copySwitchLinks linkNumber {}",
+				linkNumber);
 	}
 
 	public boolean setLinkUp(Link link) {
@@ -266,7 +267,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	}
 
 	public void deleteFlowEntry(long dpid, short portNumber) {
-		IOFSwitch sw=floodlightProvider.getSwitch(dpid);
+		IOFSwitch sw = floodlightProvider.getSwitch(dpid);
 		OFMatch match = new OFMatch();
 		match.setWildcards(Wildcards.FULL.matchOn(Flag.TP_DST));
 		match.setNetworkProtocol(IPv4.PROTOCOL_UDP);
@@ -280,9 +281,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		try {
 			sw.write(ofFlowMod, null);
 			sw.flush();
-			log.info("EnergySavingBaseOnMst.deleteFlowEntry Dpid{} portNumber{}",new Object[]{sw.getId(),portNumber});
+			log.info(
+					"EnergySavingBaseOnMst.deleteFlowEntry Dpid {} portNumber {}",
+					new Object[] { sw.getId(), portNumber });
 		} catch (Exception e) {
-			log.info("EnergySavingBaseOnMst.deleteFlowEntry error Dpid{} portNumber{}",new Object[]{sw.getId(),portNumber});
+			log.error(
+					"EnergySavingBaseOnMst.deleteFlowEntry error Dpid {} portNumber {}",
+					new Object[] { sw.getId(), portNumber });
 		}
 	}
 
@@ -314,7 +319,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		linkCostService = context.getServiceImpl(ILinkCostService.class);
 		linkDiscoveryManager = context
 				.getServiceImpl(ILinkDiscoveryService.class);
-		routingService=context.getServiceImpl(IRoutingService.class);
+		routingService = context.getServiceImpl(IRoutingService.class);
 	}
 
 	@Override
@@ -333,12 +338,15 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 						Link loopLink = getLoopLinkNonBaseDirected(
 								overloadLink, wholeTopology, currentTopology);
 						if (loopLink != null) {
-							deleteFlowEntry(overloadLink.getSrc(),overloadLink.getSrcPort());
-							log.info("LoopLink {}",loopLink);
+							log.info("LoopLink {}", loopLink);
 							setLinkUp(loopLink);
+							deleteFlowEntry(overloadLink.getSrc(),
+									overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+							deleteFlowEntry(overloadLink.getDst(),
+									overloadLink.getDstPort());
 						}
 					}
-					//log.info("route {}",routingService.getRoute(1, 4, 0));
+					// log.info("route {}",routingService.getRoute(1, 4, 0));
 				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {
