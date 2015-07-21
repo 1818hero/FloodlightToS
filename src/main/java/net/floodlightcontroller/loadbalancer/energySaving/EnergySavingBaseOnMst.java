@@ -318,7 +318,6 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		linkCostService = context.getServiceImpl(ILinkCostService.class);
 		linkDiscoveryManager = context
 				.getServiceImpl(ILinkDiscoveryService.class);
-		routingService = context.getServiceImpl(IRoutingService.class);
 	}
 
 	@Override
