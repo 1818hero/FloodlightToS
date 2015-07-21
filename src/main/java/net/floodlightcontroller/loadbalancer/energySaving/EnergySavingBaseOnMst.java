@@ -31,7 +31,6 @@ import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.mst.Mst;
 import net.floodlightcontroller.packet.IPv4;
-import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 

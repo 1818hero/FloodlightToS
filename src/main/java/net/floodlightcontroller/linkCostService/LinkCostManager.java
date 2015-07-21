@@ -149,7 +149,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 					}
 
 					// 默认设置的链路带宽时100Mbps；
-					double portUtilization_eachPort_x10 = (portRate_Mbps / 100.0) * 10;
+					double portUtilization_eachPort_x10 = portRate_Mbps ;
 					portUtilizationx10Map.put(portNumber,
 							portUtilization_eachPort_x10);
 
