@@ -408,7 +408,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 			}
 		});
 
-		newInstanceTask.reschedule(15, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(30, TimeUnit.SECONDS);
 
 	}
 
