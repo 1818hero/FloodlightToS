@@ -399,16 +399,12 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
-				try {
 					linkCost = linkCostManager.getLinkCost();
 					copySwitchLinks();
 					mstTopology = generateMstTopology(wholeTopology, linkCost);
 					downLinksTopology = findDownLink(wholeTopology, mstTopology);
 					doDownLinkOperation(downLinksTopology);
 					log.info("最小生成树拓扑生成");
-				} finally {
-					 //newInstanceTask.reschedule(10, TimeUnit.SECONDS);
-				}
 			}
 		});
 

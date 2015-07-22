@@ -1,9 +1,13 @@
 package net.floodlightcontroller.loadbalancer.energySaving;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -49,12 +53,10 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private Map<Long, Set<Link>> wholeTopology;
 	private Map<Long, Set<Link>> currentTopology;
 	private int linkNumber;
-	private Set<Link> overloadLinks=null;
+	private Map<Link, Integer> overloadLinks = null; // value值保存的是该link被打开的次数
 	// 链路权重
 	private Map<Link, Integer> linkCost;
-	private Link maxWeightLink = null;
-	private Integer maxWeight = 0;
-	private Integer threshold = 8;
+	private Integer threshold = 9;
 
 	/**
 	 * 周期性的检测网络链路权重，返回链路权重大于设定阈值的链路
@@ -63,27 +65,50 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @return
 	 */
 	public Link detectLinkWeight(Map<Link, Integer> linkCost) {
-
-		// 周期检测链路权重，周期开始时总是将下列值初始化为null和0
-		maxWeightLink = null;
-		maxWeight = 0;
-		Set<Link> links = linkCost.keySet();
-		Iterator<Link> iteratorLinks = links.iterator();
-		while (iteratorLinks.hasNext()) {
-			Link link = iteratorLinks.next();
-			Integer weight = linkCost.get(link);
-			if ((weight >= maxWeight) && !overloadLinks.contains(link)) {
-				maxWeight = weight;
-				maxWeightLink = link;
+		
+		List<Map.Entry<Link, Integer>> entryList = this
+				.getSortedLinkCost(linkCost);
+		if(entryList.size() > 0){
+			log.info("maxWeight:{}",entryList.get(0).getValue());
+		}
+		for (int i = 0; i < entryList.size(); i++) {
+			Map.Entry<Link, Integer> entry = entryList.get(i);
+			Link link = entry.getKey();
+			Integer cost = entry.getValue();
+			if (cost > threshold) {
+				if (!overloadLinks.containsKey(link)) {
+					overloadLinks.put(link, 1);
+					return link;
+				} else if (overloadLinks.get(link) < 2) {   //当一个权重大于阈值的链路被进行两次返回，则跳过不再对其进行返回
+					Integer count = overloadLinks.get(link);
+					overloadLinks.put(link, count + 1);
+					return link;
+				}else{
+					overloadLinks.remove(link);
+				}
 			}
 		}
-		log.info("maxWeight {},link {}", new Object[] { maxWeight,
-				maxWeightLink });
-		if (maxWeight > threshold) {
-			overloadLinks.add(maxWeightLink);
-			return maxWeightLink;
-		}
 		return null;
+	}
+
+	/**
+	 * 对linkCost进行正序的排序
+	 * 
+	 * @param linkCost
+	 * @return
+	 */
+	public List<Map.Entry<Link, Integer>> getSortedLinkCost(
+			Map<Link, Integer> linkCost) {
+		Set<Map.Entry<Link, Integer>> entrySet = linkCost.entrySet();
+		List<Map.Entry<Link, Integer>> entryList = new ArrayList<Map.Entry<Link, Integer>>(
+				entrySet);
+		Collections.sort(entryList, new Comparator<Map.Entry<Link, Integer>>() {
+			public int compare(Map.Entry<Link, Integer> m1,
+					Map.Entry<Link, Integer> m2) {
+				return -(m1.getValue().compareTo(m2.getValue()));
+			}
+		});
+		return entryList;
 	}
 
 	/**
@@ -231,7 +256,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		short portNumber = link.getDstPort();
 		long dpid = link.getDst();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
-		if (setPortUp(ofs, portNumber) & setPortUp(floodlightProvider.getSwitch(link.getSrc()),link.getSrcPort())) {
+		if (setPortUp(ofs, portNumber)
+				& setPortUp(floodlightProvider.getSwitch(link.getSrc()),
+						link.getSrcPort())) {
 			log.info("EnergySavingBaseOnMst.setLinkUp {} up", link);
 			return true;
 		}
@@ -323,7 +350,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
 		currentTopology = new HashMap<Long, Set<Link>>();
-		overloadLinks=new HashSet<Link>();
+		overloadLinks = new HashMap<Link,Integer>();
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
@@ -344,18 +371,17 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 								deleteFlowEntry(overloadLink.getDst(),
 										overloadLink.getDstPort());
 							}
-
 						}
 					}
 					// log.info("route {}",routingService.getRoute(1, 4, 0));
 				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {
-					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
+					newInstanceTask.reschedule(5, TimeUnit.SECONDS);
 				}
 			}
 		});
-		newInstanceTask.reschedule(30, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 	}
 
 }

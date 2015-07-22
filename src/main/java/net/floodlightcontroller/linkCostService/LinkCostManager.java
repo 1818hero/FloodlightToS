@@ -266,13 +266,12 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				}
 			}
 		});
-		newInstanceTask.reschedule(10, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(2, TimeUnit.SECONDS);
 	}
 
 	@Override
 	public void switchAdded(long switchId) {
 		this.initialFlag = true;
-		System.out.println("new switch is added!");
 
 	}
 
