@@ -59,7 +59,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private Integer threshold = 9;
 
 	/**
-	 * 周期性的检测网络链路权重，返回链路权重大于设定阈值的链路
+	 * 检测网络链路权重，返回链路权重大于设定阈值的链路
 	 * 
 	 * @param linkCost
 	 * @return
@@ -90,7 +90,35 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		}
 		return null;
 	}
-
+	/**
+	 * 批量获取大于阈值的链路
+	 * 注:为了防止过量的大于阈值的链路被返回，本方法只是获取一半的过载链路，从而平衡链路利用率和节能效果
+	 * @param linkCost
+	 * @return
+	 */
+	public List<Link> batchDetectLinkWeight(Map<Link,Integer> linkCost){
+		List<Map.Entry<Link, Integer>> entryList = this
+				.getSortedLinkCost(linkCost);
+		List<Link> localOverloadLinks = new ArrayList<Link>();
+		if(entryList.size() > 0){
+			log.info("maxWeight:{}",entryList.get(0).getValue());
+		}
+		for(int i=0;i< entryList.size();i++){
+			Map.Entry<Link, Integer> entry = entryList.get(i);
+			Link link = entry.getKey();
+			Integer cost = entry.getValue();
+			if (cost > threshold) {
+				localOverloadLinks.add(link);  //只要是大于阈值的链路都会返回，即使可能出现某天链路被打开多次
+			}
+		}
+		if(localOverloadLinks.size() <= 1 ){
+			return localOverloadLinks;
+		}else{
+			int size = localOverloadLinks.size();
+			int halfSize = size / 2;
+			return localOverloadLinks.subList(0, halfSize);
+		}
+	}
 	/**
 	 * 对linkCost进行正序的排序
 	 * 
