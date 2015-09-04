@@ -103,7 +103,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		List<Link> localOverloadLinks = new ArrayList<Link>();
 		
 		if(entryList.size() > 0){
-			log.info("maxWeight:{}",entryList.get(0).getValue());
+			log.info("【batch】maxWeight:{}",entryList.get(0).getValue());
 		}
 		
 		for(int i=0;i< entryList.size();i++){
@@ -391,7 +391,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					wholeTopology = mst.getWholeTopology();
 					copySwitchLinks(); // 保存当前网络的拓扑到currentTopology；
 					linkCost = linkCostService.getLinkCost();
-					Link overloadLink = detectLinkWeight(linkCost);
+					Link overloadLink = null;
+					//overloadLink = detectLinkWeight(linkCost);
 					List<Link> overloadLinks = batchDetectLinkWeight(linkCost);
 					boolean type = true;
 					if( type ){   //批量开启关闭的链路
@@ -406,16 +407,16 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 									log.info("batch:loopLink:{}", loopLink);
 									
 									if (setLinkUp(loopLink)) {
-										deleteFlowEntry(overloadLink.getSrc(),
-												overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
-										deleteFlowEntry(overloadLink.getDst(),
-												overloadLink.getDstPort());
+										deleteFlowEntry(link.getSrc(),
+												link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+										deleteFlowEntry(link.getDst(),
+												link.getDstPort());
 									}
 								}
 							}
 						}
 						long endTime = System.currentTimeMillis();
-						long time = (startTime-endTime);
+						long time = (endTime-startTime);
 						log.info("【Batch】:time to set links up:{} ms", time);
 					}else{      //开启单个关闭的链路
 						if (overloadLink != null) {
@@ -440,7 +441,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				}
 			}
 		});
-		newInstanceTask.reschedule(40, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(15, TimeUnit.SECONDS);
 	}
 
 }
