@@ -1,0 +1,186 @@
+21:46:38.346 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:46:38.348 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:46:43.348 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:46:43.349 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:46:48.350 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:46:48.350 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:46:53.350 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:46:53.350 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:46:58.351 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:46:58.351 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:47:03.352 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:03.352 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:47:08.352 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:08.353 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:47:13.353 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:13.354 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:47:18.354 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:18.354 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:47:23.355 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:23.355 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:47:28.355 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:28.356 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:47:33.356 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:33.356 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:47:43.358 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:43.359 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:47:48.360 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:48.360 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:47:53.360 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:53.361 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:47:58.362 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:47:58.362 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:48:03.362 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:03.363 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:48:08.363 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:08.363 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:48:13.364 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:13.364 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:48:18.365 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:18.365 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:48:23.365 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:23.366 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:48:28.366 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:28.366 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:48:33.367 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:33.367 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:48:38.367 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:38.368 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:48:43.368 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:43.368 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:48:48.369 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:48.369 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:48:53.370 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:53.370 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:48:58.370 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:48:58.371 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:49:03.371 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:03.371 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:49:08.372 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:08.372 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:49:13.372 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:13.373 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:49:18.373 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:18.373 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:49:23.374 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:23.374 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:49:28.374 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:28.374 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:49:33.375 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:33.375 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:49:38.375 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:38.376 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:49:43.376 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:43.376 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:49:48.377 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:48.377 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:49:53.377 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:53.378 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:49:58.378 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:49:58.378 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:50:03.379 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:03.379 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:50:08.379 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:08.380 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:50:13.380 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:13.380 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:50:18.381 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:18.381 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:50:23.381 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:23.382 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:50:28.382 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:28.382 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:50:33.383 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:33.383 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:50:38.383 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:38.383 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:50:43.384 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:43.384 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:50:48.384 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:48.385 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:50:53.385 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:53.385 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:50:58.386 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:50:58.386 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:51:03.386 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:03.387 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:51:08.387 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:08.387 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:51:13.388 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:13.388 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:51:18.388 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:18.389 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:51:23.389 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:23.389 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:51:28.390 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:28.390 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:51:33.390 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:33.391 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:51:38.391 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:38.391 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:51:43.392 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:43.392 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:51:48.392 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:48.393 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:51:53.393 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:53.393 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:51:58.394 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:51:58.394 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:52:03.394 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:03.395 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:52:08.395 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:08.395 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:52:13.396 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:13.396 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:52:18.397 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:18.397 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:52:23.397 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:23.397 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:52:28.398 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:28.398 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:52:33.398 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:33.399 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:52:38.399 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:38.400 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:52:43.400 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:43.400 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:52:48.401 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:48.401 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:52:53.401 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:53.402 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:52:58.402 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:52:58.402 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:53:03.403 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:03.403 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:53:08.404 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:08.404 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:53:13.405 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:13.405 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:53:18.405 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:18.405 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:53:23.406 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:23.407 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:53:28.407 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:28.408 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms
+21:53:33.408 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:33.408 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:53:38.409 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:38.409 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:53:43.409 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:43.409 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:53:48.410 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:48.410 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-4] 【Batch】:time to set links up:0 ms
+21:53:53.411 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:53.411 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-2] 【Batch】:time to set links up:0 ms
+21:53:58.411 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:53:58.412 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:54:03.412 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:54:03.412 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:54:08.413 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:54:08.413 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-3] 【Batch】:time to set links up:0 ms
+21:54:13.414 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:54:13.414 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:54:18.415 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:54:18.415 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-0] 【Batch】:time to set links up:0 ms
+21:54:23.416 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] EnergySavingBaseOnMst.copySwitchLinks linkNumber 0
+21:54:23.416 INFO [n.f.l.e.EnergySavingBaseOnMst:Scheduled-1] 【Batch】:time to set links up:0 ms

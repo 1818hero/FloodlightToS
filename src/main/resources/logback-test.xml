@@ -6,9 +6,19 @@
   </appender>
   <appender name="EV_WARN_ERR" class="net.floodlightcontroller.debugevent.DebugEventAppender">
   </appender>
+  
+  <appender name="FILEAPPENDER" class="ch.qos.logback.core.FileAppender">  
+    <file>/home/weking/floodlight/floodlight.log</file>  
+    <append>true</append>  
+    <encoder>  
+      <pattern>%d{HH:mm:ss.SSS} %level [%logger{20}:%thread] %msg%n</pattern>  
+    </encoder>  
+  </appender>
+  
   <root level="INFO">
     <appender-ref ref="STDOUT" />
     <appender-ref ref="EV_WARN_ERR" />
+    <appender-ref ref="FILEAPPENDER" />
   </root>
   <logger name="org" level="WARN"/>
   <logger name="LogService" level="WARN"/> <!-- Restlet access logging -->
