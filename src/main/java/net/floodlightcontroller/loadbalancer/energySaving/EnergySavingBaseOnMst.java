@@ -52,11 +52,16 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	// 网络的完整拓扑（网络节能前）
 	private Map<Long, Set<Link>> wholeTopology;
 	private Map<Long, Set<Link>> currentTopology;
-	private int linkNumber;
+	private int linkNumberFull;  //完全拓扑的链路总数
+	
 	private Map<Link, Integer> overloadLinks = null; // value值保存的是该link被打开的次数
 	// 链路权重
 	private Map<Link, Integer> linkCost;
 	private Integer threshold = 9;
+	
+	//动态调整阈值相关变量
+	private int linkNumberDynamic;  //超过当前设定阈值的链路数
+	private int costDynamic;
 
 	/**
 	 * 检测网络链路权重，返回链路权重大于设定阈值的链路
@@ -71,6 +76,27 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		if(entryList.size() > 0){
 			log.info("maxWeight:{}",entryList.get(0).getValue());
 		}
+		
+		
+		//获取超过当前阈值的链路数
+		for(int i = 0;i<entryList.size();i++){
+			Map.Entry<Link, Integer> entry = entryList.get(i);
+			Integer cost = entry.getValue();
+			if(cost > threshold){
+				linkNumberDynamic++;
+				costDynamic = costDynamic + cost;
+			}
+		}
+		//动态调整阈值
+		//如果当前的超过阈值的链路数超过了总链路数的30%是，就动态进行调整阈值
+		//调整策略时，逐渐降低平均值的20%
+		if( linkNumberDynamic > entryList.size() / 3){
+			threshold = threshold - (costDynamic / linkNumberDynamic)*2/10; 
+			log.info("Adjust threshold to: "+threshold);
+		}
+		
+		
+		
 		for (int i = 0; i < entryList.size(); i++) {
 			Map.Entry<Link, Integer> entry = entryList.get(i);
 			Link link = entry.getKey();
@@ -261,7 +287,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * 完成对网络拓扑信息的复制, 将网络的初始拓扑保存下来
 	 */
 	public void copySwitchLinks() {
-		linkNumber = 0; // 重新对linkNumber进行赋值，故对其做初始化操作；
+		linkNumberFull = 0; // 重新对linkNumber进行赋值，故对其做初始化操作；
 		Map<Long, Set<Link>> switchLinks = linkDiscoveryManager
 				.getSwitchLinks();
 		Set<Long> keys = switchLinks.keySet();
@@ -276,13 +302,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				link = iter2.next();
 				if (key == link.getSrc()) {
 					srcLink.add(link);
-					linkNumber++;
+					linkNumberFull++;
 				}
 			}
 			currentTopology.put(key, srcLink);
 		}
 		log.info("EnergySavingBaseOnMst.copySwitchLinks linkNumber {}",
-				linkNumber);
+				linkNumberFull);
 	}
 
 	public boolean setLinkUp(Link link) {
