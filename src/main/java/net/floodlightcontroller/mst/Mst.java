@@ -33,6 +33,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 
 	// initial topology of the network
 	private Map<Long, Set<Link>> wholeTopology = null;
+	private int linkNumberFull; //网络中链路的数量
 	// minimum spanning tree topology of the network
 	private Map<Long, Set<Link>> mstTopology = null;
 
@@ -47,6 +48,15 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 	protected ILinkDiscoveryService linkDiscoveryManager = null;
 	protected static Logger log = LoggerFactory.getLogger(Mst.class);
 	private IThreadPoolService threadPool = null;
+	
+	
+	/**
+	 * 获取当前链路的数量
+	 * @return
+	 */
+	public int getLinkNumberFull(){
+		return this.linkNumberFull;
+	}
 
 	/**
 	 * 获得最小生成树的拓扑
@@ -340,6 +350,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 				link = iter2.next();
 				if (key == link.getSrc()) {
 					srcLink.add(link);
+					linkNumberFull++;
 				}
 			}
 			wholeTopology.put(key, srcLink);

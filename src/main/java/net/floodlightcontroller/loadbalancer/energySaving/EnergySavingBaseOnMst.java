@@ -51,16 +51,18 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			.getLogger(EnergySavingBaseOnMst.class);
 	// 网络的完整拓扑（网络节能前）
 	private Map<Long, Set<Link>> wholeTopology;
+	private int linkNumberFull;  //网络完整拓扑的链路数量
 	private Map<Long, Set<Link>> currentTopology;
-	private int linkNumberFull;  //完全拓扑的链路总数
+	private int linkNumber; // 当前拓扑的链路数量
 	
+
 	private Map<Link, Integer> overloadLinks = null; // value值保存的是该link被打开的次数
 	// 链路权重
-	private Map<Link, Integer> linkCost;
+	private Map<Link, Integer> linkCostEnergySaving;
 	private Integer threshold = 9;
-	
-	//动态调整阈值相关变量
-	private int linkNumberDynamic;  //超过当前设定阈值的链路数
+
+	// 动态调整阈值相关变量
+	private int linkNumberDynamic; // 超过当前设定阈值的链路数
 	private int costDynamic;
 
 	/**
@@ -70,33 +72,30 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @return
 	 */
 	public Link detectLinkWeight(Map<Link, Integer> linkCost) {
-		
+
 		List<Map.Entry<Link, Integer>> entryList = this
 				.getSortedLinkCost(linkCost);
-		if(entryList.size() > 0){
-			log.info("maxWeight:{}",entryList.get(0).getValue());
+		if (entryList.size() > 0) {
+			log.info("maxWeight:{}", entryList.get(0).getValue());
 		}
-		
-		
-		//获取超过当前阈值的链路数
-		for(int i = 0;i<entryList.size();i++){
+
+		// 获取超过当前阈值的链路数
+		for (int i = 0; i < entryList.size(); i++) {
 			Map.Entry<Link, Integer> entry = entryList.get(i);
 			Integer cost = entry.getValue();
-			if(cost > threshold){
+			if (cost > threshold) {
 				linkNumberDynamic++;
 				costDynamic = costDynamic + cost;
 			}
 		}
-		//动态调整阈值
-		//如果当前的超过阈值的链路数超过了总链路数的30%是，就动态进行调整阈值
-		//调整策略时，逐渐降低平均值的20%
-		if( linkNumberDynamic > entryList.size() / 3){
-			threshold = threshold - (costDynamic / linkNumberDynamic)*2/10; 
-			log.info("Adjust threshold to: "+threshold);
+		// 动态调整阈值
+		// 如果当前的超过阈值的链路数超过了总链路数的30%是，就动态进行调整阈值
+		// 调整策略时，逐渐降低平均值的20%
+		if (linkNumberDynamic > entryList.size() / 3) {
+			threshold = threshold - (costDynamic / linkNumberDynamic) * 2 / 10;
+			log.info("Adjust threshold to: " + threshold);
 		}
-		
-		
-		
+
 		for (int i = 0; i < entryList.size(); i++) {
 			Map.Entry<Link, Integer> entry = entryList.get(i);
 			Link link = entry.getKey();
@@ -105,51 +104,53 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				if (!overloadLinks.containsKey(link)) {
 					overloadLinks.put(link, 1);
 					return link;
-				} else if (overloadLinks.get(link) < 2) {   //当一个权重大于阈值的链路被进行两次返回，则跳过不再对其进行返回
+				} else if (overloadLinks.get(link) < 2) { // 当一个权重大于阈值的链路被进行两次返回，则跳过不再对其进行返回
 					Integer count = overloadLinks.get(link);
 					overloadLinks.put(link, count + 1);
 					return link;
-				}else{
+				} else {
 					overloadLinks.remove(link);
 				}
 			}
 		}
 		return null;
 	}
+
 	/**
-	 * 批量获取大于阈值的链路
-	 * 注:为了防止过量的大于阈值的链路被返回，本方法只是获取一半的过载链路，从而平衡链路利用率和节能效果
+	 * 批量获取大于阈值的链路 注:为了防止过量的大于阈值的链路被返回，本方法只是获取一半的过载链路，从而平衡链路利用率和节能效果
+	 * 
 	 * @param linkCost
 	 * @return
 	 */
-	public List<Link> batchDetectLinkWeight(Map<Link,Integer> linkCost){
-		
+	public List<Link> batchDetectLinkWeight(Map<Link, Integer> linkCost) {
+
 		List<Map.Entry<Link, Integer>> entryList = this
 				.getSortedLinkCost(linkCost);
 		List<Link> localOverloadLinks = new ArrayList<Link>();
-		
-		if(entryList.size() > 0){
-			log.info("【batch】maxWeight:{}",entryList.get(0).getValue());
+
+		if (entryList.size() > 0) {
+			log.info("【batch】maxWeight:{}", entryList.get(0).getValue());
 		}
-		
-		for(int i=0;i< entryList.size();i++){
+
+		for (int i = 0; i < entryList.size(); i++) {
 			Map.Entry<Link, Integer> entry = entryList.get(i);
 			Link link = entry.getKey();
 			Integer cost = entry.getValue();
 			if (cost > threshold) {
-				localOverloadLinks.add(link);  //只要是大于阈值的链路都会返回，即使可能出现某天链路被打开多次
+				localOverloadLinks.add(link); // 只要是大于阈值的链路都会返回，即使可能出现某天链路被打开多次
 			}
 		}
-		
-		if(localOverloadLinks.size() <= 1 ){
+
+		if (localOverloadLinks.size() <= 1) {
 			return localOverloadLinks;
-		}else{
+		} else {
 			int size = localOverloadLinks.size();
 			int halfSize = size / 2;
 			return localOverloadLinks.subList(0, halfSize);
 		}
-		
+
 	}
+
 	/**
 	 * 对linkCost进行正序的排序
 	 * 
@@ -287,7 +288,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * 完成对网络拓扑信息的复制, 将网络的初始拓扑保存下来
 	 */
 	public void copySwitchLinks() {
-		linkNumberFull = 0; // 重新对linkNumber进行赋值，故对其做初始化操作；
+		linkNumber = 0; // 重新对linkNumber进行赋值，故对其做初始化操作；
 		Map<Long, Set<Link>> switchLinks = linkDiscoveryManager
 				.getSwitchLinks();
 		Set<Long> keys = switchLinks.keySet();
@@ -302,13 +303,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				link = iter2.next();
 				if (key == link.getSrc()) {
 					srcLink.add(link);
-					linkNumberFull++;
+					linkNumber++;
 				}
 			}
 			currentTopology.put(key, srcLink);
 		}
 		log.info("EnergySavingBaseOnMst.copySwitchLinks linkNumber {}",
-				linkNumberFull);
+				linkNumber);
 	}
 
 	public boolean setLinkUp(Link link) {
@@ -409,59 +410,66 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException {
 		currentTopology = new HashMap<Long, Set<Link>>();
-		overloadLinks = new HashMap<Link,Integer>();
+		overloadLinks = new HashMap<Link, Integer>();
 		ScheduledExecutorService ses = threadPool.getScheduledExecutor();
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
 				try {
 					wholeTopology = mst.getWholeTopology();
+					linkNumberFull = mst.getLinkNumberFull();
 					copySwitchLinks(); // 保存当前网络的拓扑到currentTopology；
-					linkCost = linkCostService.getLinkCost();
-					Link overloadLink = null;
-					//overloadLink = detectLinkWeight(linkCost);
-					List<Link> overloadLinks = batchDetectLinkWeight(linkCost);
-					boolean type = true;
-					if( type ){   //批量开启关闭的链路
-						long startTime = System.currentTimeMillis();
-						if(overloadLinks != null && overloadLinks.size() > 0){
-							for(Link link:overloadLinks){
-								log.info("【batch】: link：{}", link);
+					if( linkNumberFull == linkNumber ){
+						log.info("链路已经全部开启！！！");
+					}else{
+						linkCostEnergySaving = linkCostService.getLinkCostEnergySaving();
+						Link overloadLink = null;
+						// overloadLink = detectLinkWeight(linkCost);
+						List<Link> overloadLinks = batchDetectLinkWeight(linkCostEnergySaving);
+						boolean type = true;
+						if (type) { // 批量开启关闭的链路
+							long startTime = System.currentTimeMillis();
+							if (overloadLinks != null && overloadLinks.size() > 0) {
+								for (Link link : overloadLinks) {
+									log.info("【batch】: link：{}", link);
+									Link loopLink = getLoopLinkNonBaseDirected(
+											link, wholeTopology, currentTopology);
+									if (loopLink != null) {
+
+										log.info("batch:loopLink:{}", loopLink);
+
+										if (setLinkUp(loopLink)) {
+											deleteFlowEntry(link.getSrc(),
+													link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+											deleteFlowEntry(link.getDst(),
+													link.getDstPort());
+										}
+									}
+								}
+							}
+							long endTime = System.currentTimeMillis();
+							long time = (endTime - startTime);
+							log.info("【Batch】:time to set links up:{} ms", time);
+						} else { // 开启单个关闭的链路
+							if (overloadLink != null) {
 								Link loopLink = getLoopLinkNonBaseDirected(
-										link, wholeTopology, currentTopology);
+										overloadLink, wholeTopology,
+										currentTopology);
 								if (loopLink != null) {
-									
-									log.info("batch:loopLink:{}", loopLink);
-									
+									log.info("LoopLink {}", loopLink);
 									if (setLinkUp(loopLink)) {
-										deleteFlowEntry(link.getSrc(),
-												link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
-										deleteFlowEntry(link.getDst(),
-												link.getDstPort());
+										log.info("link up success");
+										deleteFlowEntry(overloadLink.getSrc(),
+												overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+										deleteFlowEntry(overloadLink.getDst(),
+												overloadLink.getDstPort());
 									}
 								}
 							}
 						}
-						long endTime = System.currentTimeMillis();
-						long time = (endTime-startTime);
-						log.info("【Batch】:time to set links up:{} ms", time);
-					}else{      //开启单个关闭的链路
-						if (overloadLink != null) {
-							Link loopLink = getLoopLinkNonBaseDirected(
-									overloadLink, wholeTopology, currentTopology);
-							if (loopLink != null) {
-								log.info("LoopLink {}", loopLink);
-								if (setLinkUp(loopLink)) {
-									log.info("link up success");
-									deleteFlowEntry(overloadLink.getSrc(),
-											overloadLink.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
-									deleteFlowEntry(overloadLink.getDst(),
-											overloadLink.getDstPort());
-								}
-							}
-						}
 					}
+					
 				} catch (Exception e) {
-					log.error("exception",e);
+					log.error("exception", e);
 				} finally {
 					newInstanceTask.reschedule(5, TimeUnit.SECONDS);
 				}

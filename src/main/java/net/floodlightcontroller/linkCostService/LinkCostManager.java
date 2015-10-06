@@ -18,6 +18,7 @@ import org.openflow.protocol.statistics.OFPortStatisticsReply;
 import org.openflow.protocol.statistics.OFPortStatisticsRequest;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
+import org.python.modules._hashlib.Hash;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		IOFSwitchListener {
 
 	private Map<Link, Integer> linkCost = new HashMap<Link, Integer>(); // dijkstra算法使用的链路权重
+	private Map<Link, Integer> linkCostEnergySaving = new HashMap<Link, Integer>(); // 网络节能使用的链路
 	private IFloodlightProviderService floodlightProvider = null;
 	private IThreadPoolService threadPool = null;
 	private SingletonTask newInstanceTask = null;
@@ -46,7 +48,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	private Map<Long, Map<Short, Long[]>> lastTimePortTraffic = new HashMap<Long, Map<Short, Long[]>>();
 	protected static Logger log = LoggerFactory
 			.getLogger(LinkCostManager.class);
-	private Map<Long, Map<Short, Double>> portUtilization_x10 = new HashMap<Long, Map<Short, Double>>();
+	private Map<Long, Map<Short, List<Double>>> switchPortRateMap = new HashMap<Long, Map<Short, List<Double>>>();
 	private boolean initialFlag = true;
 
 	/**
@@ -61,12 +63,20 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	}
 
 	/**
+	 * linkCostEnergySaving的getter方法
+	 * @return
+	 */
+	public Map<Link, Integer> getLinkCostEnergySaving() {
+		return this.linkCostEnergySaving;
+	}
+
+	/**
 	 * 更新linkCost的值
 	 */
 	public void updateLinkCost() {
 
 		if (initialFlag) {
-			synchronized (portUtilization_x10) {
+			synchronized (switchPortRateMap) {
 				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
 						.getSwitchLinks();
 				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
@@ -79,17 +89,44 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 						Link link = iteratorLink.next();
 						short portNumber = link.getSrcPort();
 						long dpid1 = link.getSrc();
-						Double cost = portUtilization_x10.get(dpid1).get(
-								portNumber);
+						Double cost = switchPortRateMap.get(dpid1).get(
+								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
 						linkCost.put(link, (int) Math.ceil(cost));
 					}
 				}
 			}
 		}
 	}
+	
+	public void updateLinkCostEnergySaving(){
+		if(initialFlag){
+			synchronized(switchPortRateMap){
+				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
+						.getSwitchLinks();
+				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
+				Iterator<Long> iteratorSwitchId = switchIds.iterator();
+				while (iteratorSwitchId.hasNext()) {
+					long dpid = iteratorSwitchId.next();
+					Set<Link> links = topologyLink.get(dpid);
+					Iterator<Link> iteratorLink = links.iterator();
+					while (iteratorLink.hasNext()) {
+						Link link = iteratorLink.next();
+						short portNumber = link.getSrcPort();
+						long dpid1 = link.getSrc();
+						Double costT = switchPortRateMap.get(dpid1).get(
+								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
+						Double costR = switchPortRateMap.get(dpid1).get(portNumber).get(1);
+						Double cost = costT > costR? costT : costR;   //始终选取发送速率和接收速率中的较大值作为节能策略时的链路权重
+						linkCostEnergySaving.put(link, (int) Math.ceil(cost));
+					}
+				}
+			}
+		}
+			
+	}
 
 	/**
-	 * 设置linkCost的值，linkCost的值时通过链路利用率映射为一个linkCost的一个值
+	 * 记录5s内端口的发送速率和接收速率
 	 */
 
 	public void mapTrafficToLinkCost() {
@@ -109,7 +146,8 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 			Iterator<OFStatistics> iteratorOFStatistics = netTraffic.get(dpid)
 					.iterator();
 			HashMap<Short, Long[]> portTraffic = new HashMap<Short, Long[]>();
-			HashMap<Short, Double> portUtilizationx10Map = new HashMap<Short, Double>();
+			
+			HashMap<Short, List<Double>> portRateMap = new HashMap<Short, List<Double>>();
 
 			while (iteratorOFStatistics.hasNext()) {
 
@@ -128,30 +166,20 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 
 				if (!initialFlag) {
 
-					long transmitByteRate = currentPortTraffic[0]
+					long transmitBytesIn5s = currentPortTraffic[0]
 							- lastTimePortTraffic.get(dpid).get(portNumber)[0];
-					long receiveByteRate = currentPortTraffic[1]
+					long receiveBytesIn5s = currentPortTraffic[1]
 							- lastTimePortTraffic.get(dpid).get(portNumber)[1];
-					long portByteRate_5s = 0;
-
-					if (transmitByteRate > receiveByteRate) {
-						portByteRate_5s = transmitByteRate;
-					} else {
-						portByteRate_5s = receiveByteRate;
-					}
-
+					List<Double> portByteRate=new ArrayList<Double>(2);  //这个数组存放着该端口的发送和接收速率
+					
+					Double transmitRate = 8* transmitBytesIn5s/(1024.0 * 1024.0 * 5);  //发送速率
+					Double receiveRate = 8* receiveBytesIn5s/(1024.0 * 1024.0 * 5);   //接受速率
+					
+					portByteRate.add(transmitRate);  //下标为0存放发送速率
+					portByteRate.add(receiveRate);  //下标为1存放接受速率
 					// portByteRate表示在间隔5s内发送的数据总数，以字节的单位进行计算
-					double portRate_Mbps = 8 * portByteRate_5s
-							/ (1024.0 * 1024.0 * 5);
-
-					if (portRate_Mbps < 0.0001) {
-						portRate_Mbps = 0;
-					}
-
-					// 默认设置的链路带宽时100Mbps；
-					double portUtilization_eachPort_x10 = portRate_Mbps ;
-					portUtilizationx10Map.put(portNumber,
-							portUtilization_eachPort_x10);
+					portRateMap.put(portNumber,
+							portByteRate);
 
 				}
 				portTraffic.put(portNumber, currentPortTraffic);
@@ -159,7 +187,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 			}
 
 			if (!initialFlag) {
-				portUtilization_x10.put(dpid, portUtilizationx10Map);
+				switchPortRateMap.put(dpid, portRateMap);
 			}
 			lastTimePortTraffic.put(dpid, portTraffic);
 		}
@@ -259,6 +287,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				try {
 					mapTrafficToLinkCost();
 					updateLinkCost();
+					updateLinkCostEnergySaving();
 				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {
