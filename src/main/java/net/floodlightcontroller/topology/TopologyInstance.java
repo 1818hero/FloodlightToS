@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,6 +163,7 @@ public class TopologyInstance {
 
         pathcache = CacheBuilder.newBuilder().concurrencyLevel(4)
                     .maximumSize(1000L)
+                    .expireAfterAccess(60, TimeUnit.SECONDS)
                     .build(
                             new CacheLoader<RouteId, Route>() {
                                 public Route load(RouteId rid) {
