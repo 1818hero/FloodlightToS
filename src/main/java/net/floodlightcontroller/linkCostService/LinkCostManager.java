@@ -295,7 +295,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				}
 			}
 		});
-		newInstanceTask.reschedule(2, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(5, TimeUnit.SECONDS);
 	}
 
 	@Override

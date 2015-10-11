@@ -163,7 +163,6 @@ public class TopologyInstance {
 
         pathcache = CacheBuilder.newBuilder().concurrencyLevel(4)
                     .maximumSize(1000L)
-                    .expireAfterAccess(60, TimeUnit.SECONDS)
                     .build(
                             new CacheLoader<RouteId, Route>() {
                                 public Route load(RouteId rid) {
@@ -722,6 +721,7 @@ public class TopologyInstance {
         Route result = null;
 
         try {
+        	
             result = pathcache.get(id);
         } catch (Exception e) {
             log.error("{}", e);
