@@ -517,7 +517,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			}
 		});
 		
-		newInstanceTask.reschedule(15, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(35, TimeUnit.SECONDS);
 	}
 
 }
