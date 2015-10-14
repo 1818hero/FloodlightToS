@@ -512,12 +512,12 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				} catch (Exception e) {
 					log.error("exception", e);
 				} finally {
-					newInstanceTask.reschedule(5, TimeUnit.SECONDS);
+					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
 				}
 			}
 		});
 		
-		newInstanceTask.reschedule(35, TimeUnit.SECONDS);
+		newInstanceTask.reschedule(20, TimeUnit.SECONDS);
 	}
 
 }
