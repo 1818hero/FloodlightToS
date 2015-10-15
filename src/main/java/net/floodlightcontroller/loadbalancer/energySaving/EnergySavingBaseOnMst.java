@@ -493,9 +493,11 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 										}
 										Set<Link> linkSet = currentTopology.get(loopLink.getSrc());
 										linkSet.add(loopLink);
+										currentTopology.put(loopLink.getSrc(), linkSet);
 										Link reverseLink = new Link(loopLink.getDst(), loopLink.getDstPort(), loopLink.getSrc(), loopLink.getSrcPort());
 										Set<Link> linkSet2 = currentTopology.get(loopLink.getDst());
 										linkSet2.add(reverseLink);
+										currentTopology.put(loopLink.getDst(), linkSet2);
 									}
 									deleteFlowEntry(link.getSrc(),
 											link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
