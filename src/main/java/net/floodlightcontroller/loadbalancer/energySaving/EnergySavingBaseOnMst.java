@@ -66,6 +66,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	private int costDynamic;
 	private int count=0; //设定更新阈值的次数，设定为过三个周期后进行更新阈值
 	
+	int runCount = 0;
+	
 	//
 	private List<Link> haveSetUpLinks = new ArrayList<Link>();
 	
@@ -235,8 +237,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		Link selectedLink = getLoopLinkBaseDirected(overloadLink,
 				wholeTopology, currentTopology);
 		if (selectedLink == null) {
-			Link link = findSelectedLink(wholeTopology, overloadLink.getDst(),
-					overloadLink.getSrc());
+			Link link = findSelectedLink(wholeTopology,currentTopology,overloadLink.getDst(),
+					overloadLink.getSrc(),1);
 			return getLoopLinkBaseDirected(link, wholeTopology, currentTopology);
 		} else {
 			return selectedLink;
@@ -279,7 +281,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				if (generalLinkEquals(tempLink, overloadLink)) {
 					continue;
 				}
-				selectedLink = findSelectedLink(wholeTopology, tempDst, src);
+				selectedLink = findSelectedLink(wholeTopology, currentTopology,tempDst, src,2);
 				if (selectedLink != null) {
 					if (!this.generalLinkEquals(overloadLink, selectedLink)) {
 						return selectedLink;
@@ -300,18 +302,30 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @param wholeTopology
 	 * @param src
 	 * @param dst
+	 * @param type type为1 表示从完整拓扑中获取给定src和dst的链路，type为2，表示从完整拓扑中获取给定的src和dst的链路，但是链路不能在当前的拓扑中
 	 * @return
 	 */
-	public Link findSelectedLink(Map<Long, Set<Link>> wholeTopology, long src,
-			long dst) {
-		Set<Link> links = wholeTopology.get(src);
-		Iterator<Link> iterator = links.iterator();
-		while (iterator.hasNext()) {
-			Link link = iterator.next();
-			if (link.getDst() == dst) {
-				return link;
+	public Link findSelectedLink(Map<Long, Set<Link>> wholeTopology,Map<Long, Set<Link>> currentTopology,
+			long src,long dst,int type) {
+		if(type == 1){
+			Set<Link> links = wholeTopology.get(src);
+			Iterator<Link> iterator = links.iterator();
+			while (iterator.hasNext()) {
+				Link link = iterator.next();
+				if (link.getDst() == dst) {
+					return link;
+				}
 			}
+		}else{
+			Set<Link> links = wholeTopology.get(src);
+			for( Link link:links){
+				if(link.getDst() == dst && !currentTopology.get(link.getSrc()).contains(link)){
+					return link;
+				}
+			}
+			
 		}
+		
 		return null;
 	}
 
@@ -367,9 +381,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		short portNumber = link.getDstPort();
 		long dpid = link.getDst();
 		IOFSwitch ofs = floodlightProvider.getSwitch(dpid);
-		if (setPortUp(ofs, portNumber) &&
+		if (ofs != null && setPortUp(ofs, portNumber) &&
 				setPortUp(floodlightProvider.getSwitch(link.getSrc()),link.getSrcPort())) {
-			log.info("EnergySavingBaseOnMst.setLinkUp {} up", link);
+			log.info("【link up】EnergySavingBaseOnMst.setLinkUp {} up", link);
 			return true;
 		}
 		return false;
@@ -465,9 +479,20 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
 				try {
+					runCount = runCount + 1;
 					wholeTopology = mst.getWholeTopology();
 					linkNumberFull = mst.getLinkNumberFull();
 					copySwitchLinks(); // 保存当前网络的拓扑到currentTopology；
+					if(runCount > 20){
+						Set<Long> keyset = currentTopology.keySet();
+						for(Long id:keyset){
+							Set<Link> links = currentTopology.get(id);
+							log.info("switch dpid:{}",id);
+							for(Link link:links){
+								log.info("link:{}",link);
+							}
+						}
+					}
 					if( linkNumberFull == linkNumber ){
 						log.info("链路已经全部开启！！！");
 					}else{
@@ -478,10 +503,11 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 							long startTime = System.currentTimeMillis();
 							if (overloadLinks != null && overloadLinks.size() > 0) {
 								for (Link link : overloadLinks) {
-									log.info("【batch】: link：{}", link);
+									log.info("拥塞链路：{}", link);
 									Link loopLink = getLoopLinkNonBaseDirected(
 											link, wholeTopology, currentTopology);
-									log.info("loopLink: {}",loopLink);
+									log.info("【LoopLink】loopLink: {}",loopLink);
+									
 									if (loopLink != null  ) {
 										if(!haveSetUpLinks.contains(loopLink)){
 											log.info("loopLink set up:{}", loopLink);
@@ -498,11 +524,13 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 										Set<Link> linkSet2 = currentTopology.get(loopLink.getDst());
 										linkSet2.add(reverseLink);
 										currentTopology.put(loopLink.getDst(), linkSet2);
+										
+										deleteFlowEntry(link.getSrc(),
+												link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
+										deleteFlowEntry(link.getDst(),
+												link.getDstPort());
 									}
-									deleteFlowEntry(link.getSrc(),
-											link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
-									deleteFlowEntry(link.getDst(),
-											link.getDstPort());
+									
 								}
 							}
 							long endTime = System.currentTimeMillis();
@@ -514,7 +542,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 				} catch (Exception e) {
 					log.error("exception", e);
 				} finally {
-					newInstanceTask.reschedule(10, TimeUnit.SECONDS);
+					newInstanceTask.reschedule(15, TimeUnit.SECONDS);
 				}
 			}
 		});
