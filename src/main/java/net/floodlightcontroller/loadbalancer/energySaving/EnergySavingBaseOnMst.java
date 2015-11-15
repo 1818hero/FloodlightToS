@@ -84,8 +84,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @param linkCost
 	 * @return
 	 */
+	@Deprecated
 	public Link detectLinkWeight(Map<Link, Integer> linkCost) {
-
+		linkNumberDynamic=0;
 		List<Map.Entry<Link, Integer>> entryList = this
 				.getSortedLinkCost(linkCost);
 		if (entryList.size() > 0) {
@@ -98,18 +99,19 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			Integer cost = entry.getValue();
 			if (cost > threshold) {
 				linkNumberDynamic++;
+				cost = cost>10?10:cost;
 				costDynamic = costDynamic + cost;
 			}
 		}
 		log.info("threshold:{}",threshold);
 		log.info("beyond the threshold link is:{}",linkNumberDynamic);
 		// 动态调整阈值
-		// 如果当前的超过阈值的链路数超过了总链路数的30%是，就动态进行调整阈值
+		// 如果当前的超过阈值的链路数超过了总链路数的10%是，就动态进行调整阈值
 		// 调整策略时，逐渐降低平均值的20%
 		if ((linkNumberDynamic > entryList.size() / 10) && threshold >0) {
 			if ( count >= 3){
-				threshold = threshold - (costDynamic / linkNumberDynamic) * 2 / 10;
-				threshold = 0;
+				threshold = threshold - (costDynamic / linkNumberDynamic) / 20;
+				threshold = threshold>0?threshold:0;
 				log.info("Adjust threshold to: " + threshold);
 				count = 0;
 			}else{
@@ -161,6 +163,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 			Map.Entry<Link, Integer> entry = entryList.get(i);
 			Integer cost = entry.getValue();
 			if (cost > threshold) {
+				cost = cost>10?10:cost;
 				linkNumberDynamic++;
 				costDynamic = costDynamic + cost;
 			}
@@ -168,11 +171,11 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		log.info("threshold:{}",threshold);
 		log.info("beyond the threshold link is:{}",linkNumberDynamic);
 		// 动态调整阈值
-		// 如果当前的超过阈值的链路数超过了总链路数的30%是，就动态进行调整阈值
+		// 如果当前的超过阈值的链路数超过了总链路数的10%是，就动态进行调整阈值
 		// 调整策略时，逐渐降低平均值的20%
 		if ((linkNumberDynamic > entryList.size() / 10) && threshold > 1) {
 			
-			threshold = threshold - (costDynamic / linkNumberDynamic) / 10;
+			threshold = threshold - (costDynamic / linkNumberDynamic) / 20;
 
 			if( threshold < 1 ){
 				threshold = 1;
@@ -483,16 +486,6 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					wholeTopology = mst.getWholeTopology();
 					linkNumberFull = mst.getLinkNumberFull();
 					copySwitchLinks(); // 保存当前网络的拓扑到currentTopology；
-					if(runCount > 20){
-						Set<Long> keyset = currentTopology.keySet();
-						for(Long id:keyset){
-							Set<Link> links = currentTopology.get(id);
-							log.info("switch dpid:{}",id);
-							for(Link link:links){
-								log.info("link:{}",link);
-							}
-						}
-					}
 					if( linkNumberFull == linkNumber ){
 						log.info("链路已经全部开启！！！");
 					}else{
@@ -529,6 +522,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 												link.getSrcPort()); // 这里必须删除当前所关联的两个交换机上的流表
 										deleteFlowEntry(link.getDst(),
 												link.getDstPort());
+									}else{
+										continue;
 									}
 									
 								}
