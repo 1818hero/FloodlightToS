@@ -489,6 +489,21 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					if( linkNumberFull == linkNumber ){
 						log.info("链路已经全部开启！！！");
 					}else{
+						
+						if(runCount % 4 == 0){
+							Map<Link,Integer> linkUtilization = linkCostService.getLinkCostEnergySaving();
+							Set<Long> keyset = currentTopology.keySet();
+							for(Long id:keyset){
+								Set<Link> links = currentTopology.get(id);
+								log.info("switch dpid:{}",id);
+								for(Link link:links){
+									log.info("linkUtilization: link={}, value={}",new Object[]{link,linkUtilization.get(link)});
+								}
+							}
+						}
+						
+						
+						
 						linkCostEnergySaving = linkCostService.getLinkCostEnergySaving();
 						List<Link> overloadLinks = batchDetectLinkWeight(linkCostEnergySaving);
 						boolean type = true;
