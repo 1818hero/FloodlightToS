@@ -40,7 +40,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 	private Map<Long, Set<Link>> downLinksTopology = null;
 
 	protected SingletonTask newInstanceTask = null;
-	protected Map<Link, Integer> linkCost = null;
+	protected Map<Link, Double> linkCost = null;
 
 	// get the linkCost from linkCostManager
 	protected IFloodlightProviderService floodlightProvider = null;
@@ -214,7 +214,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 	 * @return
 	 */
 	public Map<Long, Set<Link>> generateMstTopology(
-			Map<Long, Set<Link>> wholeTopology, Map<Link, Integer> linkCost) {
+			Map<Long, Set<Link>> wholeTopology, Map<Link, Double> linkCost) {
 
 		// 对最小生成树生成的拓扑进行初始化，最初始时整个只存在节点，而不再存在链路；
 		Set<Long> keySet = wholeTopology.keySet();
@@ -233,7 +233,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 		// 整个拓扑中交换机的个数
 		int length = keySet.size();
 		// prim算法所需要的一些变量
-		long[] value = new long[length + 1];
+		double[] value = new double[length + 1];
 		boolean[] visited = new boolean[length + 1];
 		long[] parent = new long[length + 1];
 
@@ -264,7 +264,7 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 				Link link = iterator2.next();
 
 				if (!linkCost.containsKey(link)) {
-					linkCost.put(link, 1); // 当linkCost中不包含link时，就设置为默认值1；
+					linkCost.put(link, (double)1); // 当linkCost中不包含link时，就设置为默认值1；
 				}
 				if (!visited[(int) link.getDst()]
 						&& linkCost.get(link) < value[(int) link.getDst()]) {
@@ -295,10 +295,10 @@ public class Mst implements IFloodlightModule, IFloodlightService {
 	 * @param visited
 	 * @return
 	 */
-	public int selectSwitch(long[] value, boolean[] visited) {
+	public int selectSwitch(double[] value, boolean[] visited) {
 		int length = value.length;
 		int min_index = 1;
-		long minValue = Long.MAX_VALUE;
+		double minValue = Double.MAX_VALUE;
 		for (int i = 0; i < length; i++) {
 			if (value[i] < minValue && !visited[i]) {
 				min_index = i;

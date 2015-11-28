@@ -39,8 +39,8 @@ import net.floodlightcontroller.threadpool.IThreadPoolService;
 public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		IOFSwitchListener {
 
-	private Map<Link, Integer> linkCost = new HashMap<Link, Integer>(); // dijkstra算法使用的链路权重
-	private Map<Link, Integer> linkCostEnergySaving = new HashMap<Link, Integer>(); // 网络节能使用的链路
+	private Map<Link, Double> linkCost = new HashMap<Link, Double>(); // dijkstra算法使用的链路权重
+	private Map<Link, Double> linkCostEnergySaving = new HashMap<Link, Double>(); // 网络节能使用的链路
 	private IFloodlightProviderService floodlightProvider = null;
 	private IThreadPoolService threadPool = null;
 	private SingletonTask newInstanceTask = null;
@@ -58,7 +58,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	 */
 	// getter of linkCost
 	@Override
-	public Map<Link, Integer> getLinkCost() {
+	public Map<Link,Double> getLinkCost() {
 		return linkCost;
 	}
 
@@ -66,7 +66,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	 * linkCostEnergySaving的getter方法
 	 * @return
 	 */
-	public Map<Link, Integer> getLinkCostEnergySaving() {
+	public Map<Link,Double> getLinkCostEnergySaving() {
 		return this.linkCostEnergySaving;
 	}
 
@@ -91,7 +91,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 						long dpid1 = link.getSrc();
 						Double cost = switchPortRateMap.get(dpid1).get(
 								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
-						linkCost.put(link, (int) Math.ceil(cost));
+						linkCost.put(link, cost);
 					}
 				}
 			}
@@ -117,7 +117,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
 						Double costR = switchPortRateMap.get(dpid1).get(portNumber).get(1);
 						Double cost = costT > costR? costT : costR;   //始终选取发送速率和接收速率中的较大值作为节能策略时的链路权重
-						linkCostEnergySaving.put(link, (int) Math.ceil(cost));
+						linkCostEnergySaving.put(link, cost);
 					}
 				}
 			}

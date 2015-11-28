@@ -58,12 +58,12 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 
 	private Map<Link, Integer> overloadLinks = null; // value值保存的是该link被打开的次数
 	// 链路权重
-	private Map<Link, Integer> linkCostEnergySaving;
-	private Integer threshold = 9;
+	private Map<Link, Double> linkCostEnergySaving;
+	private double threshold = 9;
 
 	// 动态调整阈值相关变量
-	private int linkNumberDynamic; // 超过当前设定阈值的链路数
-	private int costDynamic;
+	private double linkNumberDynamic; // 超过当前设定阈值的链路数
+	private double costDynamic;
 	private int count=0; //设定更新阈值的次数，设定为过三个周期后进行更新阈值
 	
 	int runCount = 0;
@@ -84,6 +84,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @param linkCost
 	 * @return
 	 */
+	/*
 	@Deprecated
 	public Link detectLinkWeight(Map<Link, Integer> linkCost) {
 		linkNumberDynamic=0;
@@ -139,6 +140,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		}
 		return null;
 	}
+	*/
 
 	/**
 	 * 批量获取大于阈值的链路 注:为了防止过量的大于阈值的链路被返回，本方法只是获取一半的过载链路，从而平衡链路利用率和节能效果
@@ -146,9 +148,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @param linkCost
 	 * @return
 	 */
-	public List<Link> batchDetectLinkWeight(Map<Link, Integer> linkCost) {
+	public List<Link> batchDetectLinkWeight(Map<Link, Double> linkCost) {
 
-		List<Map.Entry<Link, Integer>> entryList = this
+		List<Map.Entry<Link, Double>> entryList = this
 				.getSortedLinkCost(linkCost);
 		List<Link> localOverloadLinks = new ArrayList<Link>();
 
@@ -160,8 +162,8 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		costDynamic = 0;
 		// 获取超过当前阈值的链路数
 		for (int i = 0; i < entryList.size(); i++) {
-			Map.Entry<Link, Integer> entry = entryList.get(i);
-			Integer cost = entry.getValue();
+			Map.Entry<Link, Double> entry = entryList.get(i);
+			Double cost = entry.getValue();
 			if (cost > threshold) {
 				cost = cost>10?10:cost;
 				linkNumberDynamic++;
@@ -186,9 +188,9 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 		
 
 		for (int i = 0; i < entryList.size(); i++) {
-			Map.Entry<Link, Integer> entry = entryList.get(i);
+			Map.Entry<Link, Double> entry = entryList.get(i);
 			Link link = entry.getKey();
-			Integer cost = entry.getValue();
+			Double cost = entry.getValue();
 			if (cost > threshold) {
 				localOverloadLinks.add(link); // 只要是大于阈值的链路都会返回，即使可能出现某天链路被打开多次
 			}
@@ -212,14 +214,14 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 	 * @param linkCost
 	 * @return
 	 */
-	public List<Map.Entry<Link, Integer>> getSortedLinkCost(
-			Map<Link, Integer> linkCost) {
-		Set<Map.Entry<Link, Integer>> entrySet = linkCost.entrySet();
-		List<Map.Entry<Link, Integer>> entryList = new ArrayList<Map.Entry<Link, Integer>>(
+	public List<Map.Entry<Link, Double>> getSortedLinkCost(
+			Map<Link, Double> linkCost) {
+		Set<Map.Entry<Link, Double>> entrySet = linkCost.entrySet();
+		List<Map.Entry<Link, Double>> entryList = new ArrayList<Map.Entry<Link, Double>>(
 				entrySet);
-		Collections.sort(entryList, new Comparator<Map.Entry<Link, Integer>>() {
-			public int compare(Map.Entry<Link, Integer> m1,
-					Map.Entry<Link, Integer> m2) {
+		Collections.sort(entryList, new Comparator<Map.Entry<Link, Double>>() {
+			public int compare(Map.Entry<Link, Double> m1,
+					Map.Entry<Link, Double> m2) {
 				return -(m1.getValue().compareTo(m2.getValue()));
 			}
 		});
@@ -491,7 +493,7 @@ public class EnergySavingBaseOnMst implements IFloodlightModule,
 					}else{
 						
 						if(runCount % 4 == 0){
-							Map<Link,Integer> linkUtilization = linkCostService.getLinkCostEnergySaving();
+							Map<Link,Double> linkUtilization = linkCostService.getLinkCostEnergySaving();
 							Set<Long> keyset = currentTopology.keySet();
 							for(Long id:keyset){
 								Set<Link> links = currentTopology.get(id);

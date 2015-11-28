@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1238,13 +1239,20 @@ public class TopologyManager implements
                 removeLinkFromStructure(openflowLinks, link);
             }
         }
-
+        Map<Link,Integer> linkCost = new HashMap<Link,Integer>();
+        Map<Link,Double> linkCost_s = new HashMap<Link,Double>();
+        
+        Iterator<Link> iter1= linkCost_s.keySet().iterator();
+        while(iter1.hasNext()){
+        	Link link = iter1.next();
+        	linkCost.put(link, linkCost_s.get(link).intValue());
+        }
         TopologyInstance nt = new TopologyInstance(switchPorts,
                                                    blockedPorts,
                                                    openflowLinks,
                                                    broadcastDomainPorts,
                                                    tunnelPorts,
-                                                   linkCostManager.getLinkCost());
+                                                   linkCost);
         nt.compute();
         // We set the instances with and without tunnels to be identical.
         // If needed, we may compute them differently.

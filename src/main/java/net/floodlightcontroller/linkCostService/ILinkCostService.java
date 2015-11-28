@@ -5,6 +5,6 @@ import net.floodlightcontroller.routing.Link;
 import java.util.Map;
 
 public interface ILinkCostService extends IFloodlightService {
-	public Map<Link,Integer> getLinkCost();
-	public Map<Link,Integer> getLinkCostEnergySaving();
+	public Map<Link,Double> getLinkCost();
+	public Map<Link,Double> getLinkCostEnergySaving();
 }
