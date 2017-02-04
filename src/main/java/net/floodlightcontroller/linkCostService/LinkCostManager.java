@@ -43,7 +43,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	private Map<Link, Double> linkCostEnergySaving = new HashMap<Link, Double>(); // 网络节能使用的链路
 	private IFloodlightProviderService floodlightProvider = null;
 	private IThreadPoolService threadPool = null;
-	private SingletonTask newInstanceTask = null;
+	private SingletonTask  newInstanceTask = null;
 	private ILinkDiscoveryService linkDiscoveryManager = null;
 	private Map<Long, Map<Short, Long[]>> lastTimePortTraffic = new HashMap<Long, Map<Short, Long[]>>();
 	protected static Logger log = LoggerFactory
@@ -182,7 +182,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 							portByteRate);
 
 				}
-				portTraffic.put(portNumber, currentPortTraffic);
+				portTraffic.put(portNumber, currentPortTraffic);	//表示总收发信息量
 
 			}
 
