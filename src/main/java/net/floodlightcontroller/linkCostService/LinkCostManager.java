@@ -40,7 +40,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		IOFSwitchListener {
 
 	private Map<Link, Double> linkCost = new HashMap<Link, Double>(); // dijkstra算法使用的链路权重
-	private Map<Link, Double> linkCostEnergySaving = new HashMap<Link, Double>(); // 网络节能使用的链路
+	//private Map<Link, Double> linkCostEnergySaving = new HashMap<Link, Double>(); // 网络节能使用的链路
 	private IFloodlightProviderService floodlightProvider = null;
 	private IThreadPoolService threadPool = null;
 	private SingletonTask  newInstanceTask = null;
@@ -62,13 +62,13 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		return linkCost;
 	}
 
-	/**
-	 * linkCostEnergySaving的getter方法
-	 * @return
-	 */
-	public Map<Link,Double> getLinkCostEnergySaving() {
-		return this.linkCostEnergySaving;
-	}
+//	/**
+//	 * linkCostEnergySaving的getter方法
+//	 * @return
+//	 */
+//	public Map<Link,Double> getLinkCostEnergySaving() {
+//		return this.linkCostEnergySaving;
+//	}
 
 	/**
 	 * 更新linkCost的值
@@ -90,7 +90,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 						short portNumber = link.getSrcPort();
 						long dpid1 = link.getSrc();
 						Double cost = switchPortRateMap.get(dpid1).get(
-								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
+								portNumber).get(0)+switchPortRateMap.get(dpid1).get(portNumber).get(1);   //选取链路源端口的发送速率和接收速率之和作为这个链路的链路权重
 						linkCost.put(link, cost);
 					}
 				}
@@ -98,32 +98,32 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		}
 	}
 	
-	public void updateLinkCostEnergySaving(){
-		if(initialFlag){
-			synchronized(switchPortRateMap){
-				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
-						.getSwitchLinks();
-				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
-				Iterator<Long> iteratorSwitchId = switchIds.iterator();
-				while (iteratorSwitchId.hasNext()) {
-					long dpid = iteratorSwitchId.next();
-					Set<Link> links = topologyLink.get(dpid);
-					Iterator<Link> iteratorLink = links.iterator();
-					while (iteratorLink.hasNext()) {
-						Link link = iteratorLink.next();
-						short portNumber = link.getSrcPort();
-						long dpid1 = link.getSrc();
-						Double costT = switchPortRateMap.get(dpid1).get(
-								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
-						Double costR = switchPortRateMap.get(dpid1).get(portNumber).get(1);
-						Double cost = costT > costR? costT : costR;   //始终选取发送速率和接收速率中的较大值作为节能策略时的链路权重
-						linkCostEnergySaving.put(link, cost);
-					}
-				}
-			}
-		}
-			
-	}
+//	public void updateLinkCostEnergySaving(){
+//		if(initialFlag){
+//			synchronized(switchPortRateMap){
+//				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
+//						.getSwitchLinks();
+//				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
+//				Iterator<Long> iteratorSwitchId = switchIds.iterator();
+//				while (iteratorSwitchId.hasNext()) {
+//					long dpid = iteratorSwitchId.next();
+//					Set<Link> links = topologyLink.get(dpid);
+//					Iterator<Link> iteratorLink = links.iterator();
+//					while (iteratorLink.hasNext()) {
+//						Link link = iteratorLink.next();
+//						short portNumber = link.getSrcPort();
+//						long dpid1 = link.getSrc();
+//						Double costT = switchPortRateMap.get(dpid1).get(
+//								portNumber).get(0);   //始终选取一个源端口的发送速率作为这个链路的链路权重
+//						Double costR = switchPortRateMap.get(dpid1).get(portNumber).get(1);
+//						Double cost = costT > costR? costT : costR;   //始终选取发送速率和接收速率中的较大值作为节能策略时的链路权重
+//						linkCostEnergySaving.put(link, cost);
+//					}
+//				}
+//			}
+//		}
+//
+//	}
 
 	/**
 	 * 记录5s内端口的发送速率和接收速率
@@ -287,7 +287,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				try {
 					mapTrafficToLinkCost();
 					updateLinkCost();
-					updateLinkCostEnergySaving();
+					//updateLinkCostEnergySaving();
 				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {

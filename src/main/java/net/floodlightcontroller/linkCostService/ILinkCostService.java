@@ -6,5 +6,4 @@ import java.util.Map;
 
 public interface ILinkCostService extends IFloodlightService {
 	public Map<Link,Double> getLinkCost();
-	public Map<Link,Double> getLinkCostEnergySaving();
 }
