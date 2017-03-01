@@ -103,8 +103,11 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         Set<Long> allSwitches = wholeTopology.keySet();
         switchNum = allSwitches.size();
         for(int i=0;i<switchNum;i++){   //初始化TopoMatrix
-            TopoMatrix.add(new ArrayList<>());
-            for(int j=0;j<switchNum;j++)    TopoMatrix.get(i).add(INF);
+            TopoMatrix.add(new ArrayList<>(switchNum));
+            for(int j=0;j<switchNum;j++)   {
+                if(i!=j)    TopoMatrix.get(i).add(INF);
+                else TopoMatrix.get(i).add(0);
+            }
         }
         dpIdMap = new HashMap<>();
         int index = 0;
@@ -168,29 +171,32 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
 
 
     public void floyd(List<List<Integer>> path, List<List<Integer>> dist, List<List<Integer>> mMatrix) {
-
-        // 初始化
-        for (int i = 0; i < switchNum; i++) {
-            for (int j = 0; j < switchNum; j++) {
-                dist.get(i).set(j,mMatrix.get(i).get(j));    // "顶点i"到"顶点j"的路径长度为"i到j的权值"。
-                path.get(i).set(j,j);                // "顶点i"到"顶点j"的最短路径是经过顶点j。
-            }
-        }
-
-        // 计算最短路径
-        for (int k = 0; k < switchNum; k++) {
+        try {
+            // 初始化
             for (int i = 0; i < switchNum; i++) {
                 for (int j = 0; j < switchNum; j++) {
-                    // 如果经过下标为k顶点路径比原两点间路径更短，则更新dist[i][j]和path[i][j]
-                    int tmp = (dist.get(i).get(k)==INF || dist.get(k).get(j)==INF) ? INF : (dist.get(i).get(k) + dist.get(k).get(j));
-                    if (dist.get(i).get(j) > tmp) {
-                        // "i到j最短路径"对应的值设，为更小的一个(即经过k)
-                        dist.get(i).set(j,tmp);
-                        // "i到j最短路径"对应的路径，经过k
-                        path.get(i).set(j,path.get(i).get(k));
+                    dist.get(i).set(j, mMatrix.get(i).get(j));    // "顶点i"到"顶点j"的路径长度为"i到j的权值"。
+                    path.get(i).set(j, j);                // "顶点i"到"顶点j"的最短路径是经过顶点j。
+                }
+            }
+
+            // 计算最短路径
+            for (int k = 0; k < switchNum; k++) {
+                for (int i = 0; i < switchNum; i++) {
+                    for (int j = 0; j < switchNum; j++) {
+                        // 如果经过下标为k顶点路径比原两点间路径更短，则更新dist[i][j]和path[i][j]
+                        int tmp = (dist.get(i).get(k) == INF || dist.get(k).get(j) == INF) ? INF : (dist.get(i).get(k) + dist.get(k).get(j));
+                        if (dist.get(i).get(j) > tmp) {
+                            // "i到j最短路径"对应的值设，为更小的一个(即经过k)
+                            dist.get(i).set(j, tmp);
+                            // "i到j最短路径"对应的路径，经过k
+                            path.get(i).set(j, path.get(i).get(k));
+                        }
                     }
                 }
             }
+        }catch (Exception e){
+            log.error("Floyd failed to execute!");
         }
     }
 
@@ -202,12 +208,44 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         double threshold = factor*MaxSpeed;
 //        if(TopoChanged||CostLevelChanged) {
             double level = MaxSpeed*(1-factor)/ToSLevelNum;
-            List<List<Integer>> curTopoMatrix = new ArrayList<>();  //初始化不同ToS分级下的邻接矩阵
+            //不同ToS分级下的邻接矩阵
+            List<List<Integer>> curTopoMatrix = new ArrayList<>();
+            //初始化距离矩阵
+            List<List<Integer>> dist = new ArrayList<>();
+            //初始化总的routeTable
+            routeTable = new ArrayList<>();
+
+            //初始化邻接矩阵和距离矩阵
             for(int i=0;i<switchNum;i++){
                 curTopoMatrix.add(new ArrayList<>(switchNum));
+                dist.add(new ArrayList<>(switchNum));
+                for(int j=0;j < switchNum;j++){
+                    dist.get(i).add(INF);   //在floyd算法中还会被初始化
+                    if(i!=j)    curTopoMatrix.get(i).add(INF);
+                    else curTopoMatrix.get(i).add(0);
+                }
             }
             for (int i = 0; i < ToSLevelNum; i++) {
-
+                //初始化每一张routeTable
+                routeTable.add(new ArrayList<>());
+                List<List<Integer>> everyRouteTable = routeTable.get(i);
+                for(int j=0;j<switchNum;j++){
+                    everyRouteTable.add(new ArrayList<>(switchNum));
+                    //在floyd算法中还会被初始化
+                    for(int k=0;k<switchNum;k++)    everyRouteTable.get(j).add(INF);
+                }
+                Set<Link> linkSet = predictLinkCost.keySet();
+                //构造当前ToS下的拓扑邻接矩阵
+                for(Link link : linkSet){
+                    double curLoad = predictLinkCost.get(link);
+                    int srcIndex = dpIdMap.get(link.getSrc());
+                    int dstIndex = dpIdMap.get(link.getDst());
+                    if(curLoad < threshold) {   //当未达到拥塞门限时则视为链路开放
+                        curTopoMatrix.get(srcIndex).set(dstIndex, 1);
+                        curTopoMatrix.get(dstIndex).set(srcIndex, 1);
+                    }
+                }
+                floyd(everyRouteTable,dist,curTopoMatrix);    //Floyd算法计算该ToS下的最短路
                 threshold+=level;
             }
  //       }
@@ -251,7 +289,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         linkDiscoveryManager = context
                 .getServiceImpl(ILinkDiscoveryService.class);
         deviceManager = context.getServiceImpl(IDeviceService.class);
-        routeTable = new ArrayList<>();
+
     }
 
     @Override
@@ -264,7 +302,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                     linkCost = linkCostService.getLinkCost();   //获取链路速率
                     copySwitchLinks();  //获取拓扑
                     predictLinkCost = linkCost;     //暂时先这么写
-
+                    routeCompute();
                     allDevices = deviceManager.getAllDevices();
                     log.info("run RouteByToS");
 
