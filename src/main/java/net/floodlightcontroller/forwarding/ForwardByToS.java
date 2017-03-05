@@ -11,14 +11,14 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.util.AppCookie;
+import net.floodlightcontroller.counter.ICounterStoreService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.loadbalancer.RouteByToS.IRouteByToS;
 import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.routing.ForwardingBase;
-import net.floodlightcontroller.routing.IRoutingDecision;
-import net.floodlightcontroller.routing.Route;
+import net.floodlightcontroller.routing.*;
+import net.floodlightcontroller.topology.ITopologyService;
 import org.openflow.protocol.*;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
@@ -37,12 +37,13 @@ import static java.lang.Thread.sleep;
 public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
     protected static Logger log = LoggerFactory.getLogger(ForwardByToS.class);
     private IRouteByToS router = null;
+    private static int INF = Integer.MAX_VALUE;
 
     @Override
     public Command processPacketInMessage(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx) {
         Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-
+        Map<Long,Set<Link>> topo = router.getWholeTopology();
         // If a decision has been made we obey it
         // otherwise we just forward
         if (decision != null) {
@@ -130,146 +131,102 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
         }
     }
 
+    /**
+     * 根据ToS查询对应路由表
+     * @param sw
+     * @param pi
+     * @param cntx
+     * @param requestFlowRemovedNotifn
+     */
     protected void doForwardFlow(IOFSwitch sw, OFPacketIn pi,
                                  FloodlightContext cntx,
                                  boolean requestFlowRemovedNotifn) {
         OFMatch match = new OFMatch();
         match.loadFromPacket(pi.getPacketData(), pi.getInPort());
 
-        // Check if we have the location of the destination
+
         IDevice dstDevice =
                 IDeviceService.fcStore.
                         get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
-
         if (dstDevice != null) {
             IDevice srcDevice =
                     IDeviceService.fcStore.
                             get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
-            Long srcIsland = topology.getL2DomainId(sw.getId());
-
             if (srcDevice == null) {
                 log.debug("No device entry found for source device");
                 return;
             }
-            if (srcIsland == null) {
-                log.debug("No openflow island found for source {}/{}",
-                        sw.getStringId(), pi.getInPort());
-                return;
-            }
-
-            // Validate that we have a destination known on the same island
-            // Validate that the source and destination are not on the same switchport
-            boolean on_same_island = false;
-            boolean on_same_if = false;
-            for (SwitchPort dstDap : dstDevice.getAttachmentPoints()) {
-                long dstSwDpid = dstDap.getSwitchDPID();
-                Long dstIsland = topology.getL2DomainId(dstSwDpid);
-                if ((dstIsland != null) && dstIsland.equals(srcIsland)) {
-                    on_same_island = true;
-                    if ((sw.getId() == dstSwDpid) &&
-                            (pi.getInPort() == dstDap.getPort())) {
-                        on_same_if = true;
-                    }
-                    break;
-                }
-            }
-
-            if (!on_same_island) {
-                // Flood since we don't know the dst device
-                if (log.isTraceEnabled()) {
-                    log.trace("No first hop island found for destination " +
-                            "device {}, Action = flooding", dstDevice);
-                }
-                doFlood(sw, pi, cntx);
-                return;
-            }
-
-            if (on_same_if) {
-                if (log.isTraceEnabled()) {
-                    log.trace("Both source and destination are on the same " +
-                                    "switch/port {}/{}, Action = NOP",
-                            sw.toString(), pi.getInPort());
-                }
-                return;
-            }
-
             // Install all the routes where both src and dst have attachment
             // points.  Since the lists are stored in sorted order we can
             // traverse the attachment points in O(m+n) time
             SwitchPort[] srcDaps = srcDevice.getAttachmentPoints();
-            Arrays.sort(srcDaps, clusterIdComparator);
+
             SwitchPort[] dstDaps = dstDevice.getAttachmentPoints();
-            Arrays.sort(dstDaps, clusterIdComparator);
 
-            int iSrcDaps = 0, iDstDaps = 0;
-
-            while ((iSrcDaps < srcDaps.length) && (iDstDaps < dstDaps.length)) {
-                SwitchPort srcDap = srcDaps[iSrcDaps];
-                SwitchPort dstDap = dstDaps[iDstDaps];
-
-                // srcCluster and dstCluster here cannot be null as
-                // every switch will be at least in its own L2 domain.
-                Long srcCluster =
-                        topology.getL2DomainId(srcDap.getSwitchDPID());
-                Long dstCluster =
-                        topology.getL2DomainId(dstDap.getSwitchDPID());
-
-                int srcVsDest = srcCluster.compareTo(dstCluster);
-                if (srcVsDest == 0) {
-                    if (!srcDap.equals(dstDap)) {
-                        Route route =
-                                routingEngine.getRoute(srcDap.getSwitchDPID(),
-                                        (short)srcDap.getPort(),
-                                        dstDap.getSwitchDPID(),
-                                        (short)dstDap.getPort(), 0); //cookie = 0, i.e., default route
-                        if (route != null) {
-                            if (log.isTraceEnabled()) {
-                                log.trace("pushRoute match={} route={} " +
-                                                "destination={}:{}",
-                                        new Object[] {match, route,
-                                                dstDap.getSwitchDPID(),
-                                                dstDap.getPort()});
-                            }
-                            long cookie =
-                                    AppCookie.makeCookie(FORWARDING_APP_ID, 0);
-
-                            // if there is prior routing decision use wildcard
-                            Integer wildcard_hints = null;
-                            IRoutingDecision decision = null;
-                            if (cntx != null) {
-                                decision = IRoutingDecision.rtStore
-                                        .get(cntx,
-                                                IRoutingDecision.CONTEXT_DECISION);
-                            }
-                            if (decision != null) {
-                                wildcard_hints = decision.getWildcards();
-                            } else {
-                                // L2 only wildcard if there is no prior route decision
-                                wildcard_hints = ((Integer) sw
-                                        .getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
-                                        .intValue()
-                                        & ~OFMatch.OFPFW_IN_PORT
-                                        & ~OFMatch.OFPFW_DL_VLAN
-                                        & ~OFMatch.OFPFW_DL_SRC
-                                        & ~OFMatch.OFPFW_DL_DST
-                                        & ~OFMatch.OFPFW_NW_SRC_MASK
-                                        & ~OFMatch.OFPFW_NW_DST_MASK;
-                            }
-
-                            pushRoute(route, match, wildcard_hints, pi, sw.getId(), cookie,
-                                    cntx, requestFlowRemovedNotifn, false,
-                                    OFFlowMod.OFPFC_ADD);
+            byte DSCP = match.getNetworkTypeOfService();
+            //ToS计算规则
+            int ToSLevel = (DSCP&0x03)+((DSCP>>2)&0x03)+((DSCP>>4)&0x03);
+            int PathCost = INF;
+            SwitchPort pickedSrc = null;
+            SwitchPort pickedDst = null;
+            //从所有接入点中选择路径最短的一条
+            for(SwitchPort srcDap : srcDaps){
+                for(SwitchPort dstDap : dstDaps){
+                    Route r = router.getRoute(srcDap.getSwitchDPID(), dstDap.getSwitchDPID(), 0, ToSLevel, true);
+                    if(r!=null){
+                        if(r.getRouteCount()<PathCost){
+                            PathCost = r.getRouteCount();
+                            pickedSrc = srcDap;
+                            pickedDst = dstDap;
                         }
                     }
-                    iSrcDaps++;
-                    iDstDaps++;
-                } else if (srcVsDest < 0) {
-                    iSrcDaps++;
-                } else {
-                    iDstDaps++;
                 }
             }
-        } else {
+            Route route = router.getRoute(pickedSrc.getSwitchDPID(),
+                    (short)pickedSrc.getPort(),
+                    pickedDst.getSwitchDPID(),
+                    (short)pickedDst.getPort(),
+                    0,ToSLevel,true);
+
+            if (route != null) {
+                if (log.isTraceEnabled()) {
+                    log.trace("pushRoute match={} route={} " +
+                                    "destination={}:{}",
+                            new Object[] {match, route,
+                                    pickedDst.getSwitchDPID(),
+                                    pickedSrc.getPort()});
+                }
+                long cookie =
+                        AppCookie.makeCookie(FORWARDING_APP_ID, 0);
+
+                // if there is prior routing decision use wildcard
+                Integer wildcard_hints = null;
+                IRoutingDecision decision = null;
+                if (cntx != null) {
+                    decision = IRoutingDecision.rtStore
+                            .get(cntx,
+                                    IRoutingDecision.CONTEXT_DECISION);
+                }
+                if (decision != null) {
+                    wildcard_hints = decision.getWildcards();
+                } else {
+                    // L2 only wildcard if there is no prior route decision
+                    wildcard_hints = ((Integer) sw
+                            .getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
+                            .intValue()
+                            & ~OFMatch.OFPFW_IN_PORT
+                            & ~OFMatch.OFPFW_DL_VLAN
+                            & ~OFMatch.OFPFW_DL_SRC
+                            & ~OFMatch.OFPFW_DL_DST
+                            & ~OFMatch.OFPFW_NW_SRC_MASK
+                            & ~OFMatch.OFPFW_NW_DST_MASK;
+                }
+
+                pushRoute(route, match, wildcard_hints, pi, sw.getId(), cookie,
+                        cntx, requestFlowRemovedNotifn, false,
+                        OFFlowMod.OFPFC_ADD);
+            }
+        }else {
             // Flood since we don't know the dst device
             doFlood(sw, pi, cntx);
         }
@@ -355,12 +312,19 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
 
     @Override
     public void init(FloodlightModuleContext context) throws FloodlightModuleException {
+        super.init();
+        this.floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
+        this.deviceManager = context.getServiceImpl(IDeviceService.class);
+        this.routingEngine = context.getServiceImpl(IRoutingService.class);
+        this.topology = context.getServiceImpl(ITopologyService.class);
+        this.counterStore = context.getServiceImpl(ICounterStoreService.class);
         router = context.getServiceImpl(IRouteByToS.class);
     }
 
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-        //log.info(router);
+        super.startUp();
+        log.info("forwarding");
     }
 
 

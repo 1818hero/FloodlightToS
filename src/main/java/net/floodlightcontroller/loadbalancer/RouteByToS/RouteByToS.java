@@ -13,7 +13,9 @@ import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.LinkInfo;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.routing.Route;
+import net.floodlightcontroller.routing.RouteId;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
+import net.floodlightcontroller.topology.NodePortTuple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,15 +50,20 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
 
     //dpId和拓扑邻接矩阵下标之间的映射关系
     private Map<Long, Integer>  dpIdMap;
+    private Map<Integer, Long>  IndexMap;
 
     //拓扑图(邻接矩阵形式)
-    private List<List<Integer>> TopoMatrix;
+    private List<List<Link>> TopoMatrix;
     //拓扑中的设备
     private Collection<? extends IDevice> allDevices;
     //拓扑中的交换机数目
     private int switchNum = 0;
-    // 路由表,即ToS分级下的path
+    // 路由表，即ToS分级下的path
     private List<List<List<Integer>>> routeTable;
+    // 距离表，即ToS分级下的dist
+    private List<List<List<Integer>>> dist;
+    // 路由结果
+    private List<Map<RouteId,Route>> routeCache;
     // 顶点集合
     private char[] mVexs;
     // ToS分级下的拓扑
@@ -74,6 +81,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     public void copySwitchLinks() {
         wholeTopology = new HashMap<>();
         TopoMatrix = new ArrayList<>();
+        dpIdMap = new HashMap<>();
+        IndexMap = new HashMap<>();
 
         Map<Long, Set<Link>> switchLinks = linkDiscoveryManager
                 .getSwitchLinks();
@@ -81,7 +90,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         Set<Long> keys = switchLinks.keySet();
         Iterator<Long> iter1 = keys.iterator();
         while (iter1.hasNext()) {
-
             Long key = iter1.next();
             Set<Link> links = switchLinks.get(key);
             Set<Link> srcLink = new HashSet<Link>();
@@ -102,25 +110,31 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
 
         Set<Long> allSwitches = wholeTopology.keySet();
         switchNum = allSwitches.size();
+
+        int index = 0;
+        //建立dpid和index之间的映射关系
+        for(long dpid : allSwitches){
+            dpIdMap.put(dpid, index);
+            IndexMap.put(index, dpid);
+            index++;
+        }
+
         for(int i=0;i<switchNum;i++){   //初始化TopoMatrix
             TopoMatrix.add(new ArrayList<>(switchNum));
             for(int j=0;j<switchNum;j++)   {
-                if(i!=j)    TopoMatrix.get(i).add(INF);
-                else TopoMatrix.get(i).add(0);
+                if(i!=j)    TopoMatrix.get(i).add(null);
+                else    TopoMatrix.get(i).add(new Link());  // 什么都没有的link表示自己连接自己
             }
         }
-        dpIdMap = new HashMap<>();
-        int index = 0;
-        //建立dpid和index之间的映射关系
-        for(long dpid : allSwitches)    dpIdMap.put(dpid, index++);
+
 
         Map<Link,LinkInfo> allLinks = linkDiscoveryManager.getLinks();
         //建立邻接矩阵形式的拓扑图
         for(Link link : allLinks.keySet()){
             int srcIndex = dpIdMap.get(link.getSrc());
             int dstIndex = dpIdMap.get(link.getDst());
-            TopoMatrix.get(srcIndex).set(dstIndex, 1);
-            TopoMatrix.get(dstIndex).set(srcIndex, 1);
+            TopoMatrix.get(srcIndex).set(dstIndex, link);
+            TopoMatrix.get(dstIndex).set(srcIndex, link);
         }
         log.info("copy topo finished");
 		/*
@@ -189,7 +203,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                         if (dist.get(i).get(j) > tmp) {
                             // "i到j最短路径"对应的值设，为更小的一个(即经过k)
                             dist.get(i).set(j, tmp);
-                            // "i到j最短路径"对应的路径，经过k
+                            // "i到j最短路径"对应的路径，经过k (path是从第一个坐标为起点，到达第二个坐标时的下一跳)
                             path.get(i).set(j, path.get(i).get(k));
                         }
                     }
@@ -208,31 +222,38 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         double threshold = factor*MaxSpeed;
 //        if(TopoChanged||CostLevelChanged) {
             double level = MaxSpeed*(1-factor)/ToSLevelNum;
-            //不同ToS分级下的邻接矩阵
+            //不同ToS分级下的邻接矩阵(1表示邻接)
             List<List<Integer>> curTopoMatrix = new ArrayList<>();
             //初始化距离矩阵
-            List<List<Integer>> dist = new ArrayList<>();
+            dist = new ArrayList<>();
             //初始化总的routeTable
             routeTable = new ArrayList<>();
-
-            //初始化邻接矩阵和距离矩阵
+            //初始化总的routeCache
+            routeCache = new ArrayList<>();
+            //初始化邻接矩阵
             for(int i=0;i<switchNum;i++){
                 curTopoMatrix.add(new ArrayList<>(switchNum));
-                dist.add(new ArrayList<>(switchNum));
                 for(int j=0;j < switchNum;j++){
-                    dist.get(i).add(INF);   //在floyd算法中还会被初始化
                     if(i!=j)    curTopoMatrix.get(i).add(INF);
                     else curTopoMatrix.get(i).add(0);
                 }
             }
             for (int i = 0; i < ToSLevelNum; i++) {
-                //初始化每一张routeTable
+                //初始化每一张routeTable、dist以及routeCache
                 routeTable.add(new ArrayList<>());
+                dist.add(new ArrayList<>());
+                routeCache.add(new HashMap<RouteId,Route>());
                 List<List<Integer>> everyRouteTable = routeTable.get(i);
+                List<List<Integer>> everyDist = dist.get(i);
+
                 for(int j=0;j<switchNum;j++){
                     everyRouteTable.add(new ArrayList<>(switchNum));
+                    everyDist.add(new ArrayList<>(switchNum));
                     //在floyd算法中还会被初始化
-                    for(int k=0;k<switchNum;k++)    everyRouteTable.get(j).add(INF);
+                    for(int k=0;k<switchNum;k++){
+                        everyRouteTable.get(j).add(INF);
+                        everyDist.get(j).add(INF);
+                    }
                 }
                 Set<Link> linkSet = predictLinkCost.keySet();
                 //构造当前ToS下的拓扑邻接矩阵
@@ -245,12 +266,69 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                         curTopoMatrix.get(dstIndex).set(srcIndex, 1);
                     }
                 }
-                floyd(everyRouteTable,dist,curTopoMatrix);    //Floyd算法计算该ToS下的最短路
+                //Floyd算法计算该ToS下的最短路
+                floyd(everyRouteTable,everyDist,curTopoMatrix);
+                //将路由计算结果写入routeCache
+                Map<RouteId,Route> curCache = routeCache.get(i);
+                //循环+递归加入路径cache
+                for(int src=0;src<switchNum;src++){
+                    for(int dst=0;dst<switchNum;dst++){
+                        addCache(src,dst,curCache,everyDist,everyRouteTable);
+                    }
+                }
                 threshold+=level;
             }
  //       }
     }
 
+    /**
+     * 递归增添路径到cache
+     * @param src 起点对应邻接矩阵的下标
+     * @param dst 终点对应的邻接矩阵的下标
+     * @param curCache 当前ToS级别下的路径cache
+     * @param everyDist 当前ToS级别下的距离矩阵
+     * @param everyRouteTable 当前ToS级别下的路由表
+     */
+    public void addCache(int src,int dst,
+                         Map<RouteId,Route> curCache,
+                         List<List<Integer>> everyDist,
+                         List<List<Integer>> everyRouteTable
+                         )
+    {
+        //如果路径存在并且在cache中不存在该路径则添加路径
+        if(everyDist.get(src).get(dst)!=INF) {
+            RouteId curId = new RouteId(IndexMap.get(src),IndexMap.get(dst));
+            if(!curCache.containsKey(curId)){
+                List<NodePortTuple> path = new ArrayList<>();
+                Route r = new Route(curId,null);
+                int nextHopIndex = everyRouteTable.get(src).get(dst);
+                if(nextHopIndex!=dst){
+                    RouteId nextHopId = new RouteId((IndexMap.get(nextHopIndex)),IndexMap.get(dst));
+                    //如果cache中不存在下一跳到终点的记录，则递归寻找
+                    if(!curCache.containsKey(nextHopId)){
+                        addCache(nextHopIndex,dst,curCache,everyDist,everyRouteTable);
+                    }
+                    path.addAll((List<NodePortTuple>)curCache.get(nextHopId));
+                }
+                //根据拓扑矩阵确定src到nextHop之间的端口对应关系
+                NodePortTuple srcNPT ;
+                NodePortTuple nextHopNPT;
+                Link link = TopoMatrix.get(src).get(nextHopIndex);
+                //必然只有这两种情况，否则我去吃屎
+                if(link.getSrc()==IndexMap.get(src)){
+                    srcNPT = new NodePortTuple(link.getSrc(),link.getSrcPort());
+                    nextHopNPT = new NodePortTuple(link.getDst(),link.getDstPort());
+                }
+                else{
+                    srcNPT = new NodePortTuple(link.getDst(),link.getDstPort());
+                    nextHopNPT = new NodePortTuple(link.getSrc(),link.getSrcPort());
+                }
+                path.add(0,nextHopNPT);
+                path.add(0,srcNPT);
+                curCache.put(curId,new Route(curId,path));
+            }
+        }
+    }
 
     public Map<Link, Double> getLinkCost() {
         return linkCost;
@@ -309,31 +387,86 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                }catch (Exception e){
                    log.error("exception",e);
                }finally{
-                   newInstanceTask.reschedule(15, TimeUnit.SECONDS);
+                   newInstanceTask.reschedule(120, TimeUnit.SECONDS);
                }
            }
         });
-        newInstanceTask.reschedule(20, TimeUnit.SECONDS);
+        newInstanceTask.reschedule(120, TimeUnit.SECONDS);
+    }
+    @Override
+    public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, int TosLevel, boolean tunnelEnabled){
+        // Return null the route source and desitnation are the
+        // same switchports.
+        if (srcId == dstId && srcPort == dstPort)
+            return null;
+
+        List<NodePortTuple> nptList;
+        NodePortTuple npt;
+        Route r = getRoute(srcId, dstId,0 , TosLevel, true);
+        if (r == null && srcId != dstId) return null;
+
+        if (r != null) {
+            nptList= new ArrayList<NodePortTuple>(r.getPath());
+        } else {
+            nptList = new ArrayList<NodePortTuple>();
+        }
+        npt = new NodePortTuple(srcId, srcPort);
+        nptList.add(0, npt); // add src port to the front
+        npt = new NodePortTuple(dstId, dstPort);
+        nptList.add(npt); // add dst port to the end
+
+        RouteId id = new RouteId(srcId, dstId);
+        r = new Route(id, nptList);
+        return r;
+    }
+    @Override
+    public Route getRoute(long src, long dst, long cookie, int ToSLevel, boolean tunnelEnabled){
+        if(src==dst) return null;
+        RouteId id = new RouteId(src, dst);
+        Route result = null;
+        int i=ToSLevel;
+        if(i>ToSLevelNum) i=ToSLevelNum;    //如果包对应的级别超过ToSLevel总数，则按最高级别选择路由
+        while(result==null) {
+            try {
+                Map<RouteId, Route> curCache = routeCache.get(i);
+                if (curCache.containsKey(id)) {
+                    result = curCache.get(id);
+                } else if (i < ToSLevelNum) {   //如果当前级别不存在路径就提高ToS级别
+                    i++;
+                } else {
+                    log.error("Route not found");
+                    return null;
+                }
+            }catch (Exception e){
+                log.error("Route not found");
+                return null;
+            }
+        }
+        if (log.isTraceEnabled()) {
+            log.trace("getRoute: {} -> {}", id, result);
+        }
+        return result;
     }
 
     @Override
     public Route getRoute(long src, long dst, long cookie) {
-        return null;
+        return getRoute(src, dst, cookie, true);
     }
 
     @Override
     public Route getRoute(long src, long dst, long cookie, boolean tunnelEnabled) {
-        return null;
+        //tunnelEnabled和cookie未使用
+        return getRoute(src, dst, cookie, ToSLevelNum, true);    //默认最高级别
     }
 
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie) {
-        return null;
+        return getRoute(srcId, srcPort, dstId, dstPort, cookie, ToSLevelNum, true);//默认最高级别
     }
 
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, boolean tunnelEnabled) {
-        return null;
+        return getRoute(srcId, srcPort, dstId, dstPort, cookie, ToSLevelNum, true);//默认最高级别
     }
 
     @Override
