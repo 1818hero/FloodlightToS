@@ -6,4 +6,5 @@ import java.util.Map;
 
 public interface ILinkCostService extends IFloodlightService {
 	public Map<Link,Double> getLinkCost();
+	public void runLinkCostService() throws InterruptedException;
 }

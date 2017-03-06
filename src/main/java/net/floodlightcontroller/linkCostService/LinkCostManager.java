@@ -62,6 +62,17 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		return linkCost;
 	}
 
+
+	//运行LinkCostService
+	@Override
+	public void runLinkCostService() throws InterruptedException {
+		floodlightProvider.addOFSwitchListener(this);
+		mapTrafficToLinkCost();
+        Thread.sleep(5);
+        mapTrafficToLinkCost(); //  计算5s内的链路情况
+		updateLinkCost();
+	}
+
 //	/**
 //	 * linkCostEnergySaving的getter方法
 //	 * @return

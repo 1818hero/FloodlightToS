@@ -43,7 +43,7 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
     public Command processPacketInMessage(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx) {
         Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-        Map<Long,Set<Link>> topo = router.getWholeTopology();
+        //Map<Long,Set<Link>> topo = router.getWholeTopology();
         // If a decision has been made we obey it
         // otherwise we just forward
         if (decision != null) {
@@ -182,6 +182,7 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
                     }
                 }
             }
+            if(pickedDst==null||pickedSrc==null)    return;     //可能正在更新路由表或者不连通，此时应调用默认路由方式处理
             Route route = router.getRoute(pickedSrc.getSwitchDPID(),
                     (short)pickedSrc.getPort(),
                     pickedDst.getSwitchDPID(),
