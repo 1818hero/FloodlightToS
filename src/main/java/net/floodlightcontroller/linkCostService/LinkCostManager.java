@@ -85,13 +85,13 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	 * 更新linkCost的值
 	 */
 	public void updateLinkCost() {
-
-		if (initialFlag) {
+		if (!initialFlag) {
 			synchronized (switchPortRateMap) {
 				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
 						.getSwitchLinks();
 				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
 				Iterator<Long> iteratorSwitchId = switchIds.iterator();
+                linkCost.clear();	//新增
 				while (iteratorSwitchId.hasNext()) {
 					long dpid = iteratorSwitchId.next();
 					Set<Link> links = topologyLink.get(dpid);
@@ -107,6 +107,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				}
 			}
 		}
+        else initialFlag=false;  //新增
 	}
 	
 //	public void updateLinkCostEnergySaving(){
@@ -141,10 +142,9 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	 */
 
 	public void mapTrafficToLinkCost() {
-		if (!initialFlag) { // 当要进行更新linkCost时，就删除linkCost；
-			linkCost.clear();
-		}
-
+//		if (!initialFlag) { // 当要进行更新linkCost时，就删除linkCost；
+//			linkCost.clear();
+//		}
 		Map<Long, List<OFStatistics>> netTraffic = new HashMap<Long, List<OFStatistics>>();
 		netTraffic = this.collectTraffic();
 		Set<Long> dpids = netTraffic.keySet(); // 网络中的所有的交换机的dpid；
@@ -152,7 +152,6 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		Iterator<Long> dpidIterator = dpids.iterator();
 
 		while (dpidIterator.hasNext()) {
-
 			Long dpid = dpidIterator.next();
 			Iterator<OFStatistics> iteratorOFStatistics = netTraffic.get(dpid)
 					.iterator();
@@ -202,7 +201,8 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 			}
 			lastTimePortTraffic.put(dpid, portTraffic);
 		}
-		initialFlag = initialFlag ? false : true;
+
+		//initialFlag = initialFlag ? false : true;
 
 	}
 

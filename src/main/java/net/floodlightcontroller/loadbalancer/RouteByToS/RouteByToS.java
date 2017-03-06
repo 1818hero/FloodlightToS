@@ -218,7 +218,10 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
      * @return
      */
     public void routeCompute(){
-        if(predictLinkCost==null||predictLinkCost.isEmpty())    return;
+        if(predictLinkCost==null||predictLinkCost.isEmpty()){
+            log.error("LinkCost is null");
+            return;
+        }
         double threshold = factor*MaxSpeed;
 //        if(TopoChanged||CostLevelChanged) {
             double level = MaxSpeed*(1-factor)/ToSLevelNum;
@@ -392,7 +395,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                    copySwitchLinks();  //获取拓扑
                    predictLinkCost = linkCost;     //暂时先这么写
                    routeCompute();
-                   allDevices = deviceManager.getAllDevices();
+                   //allDevices = deviceManager.getAllDevices();
                    log.info("run RouteByToS");
                }catch (Exception e){
                    log.error("exception",e);

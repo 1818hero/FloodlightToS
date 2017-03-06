@@ -182,7 +182,10 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
                     }
                 }
             }
-            if(pickedDst==null||pickedSrc==null)    return;     //可能正在更新路由表或者不连通，此时应调用默认路由方式处理
+            if(pickedDst==null||pickedSrc==null){
+                log.error("no proper attachment");
+                return;     //可能正在更新路由表或者不连通
+            }
             Route route = router.getRoute(pickedSrc.getSwitchDPID(),
                     (short)pickedSrc.getPort(),
                     pickedDst.getSwitchDPID(),
@@ -229,6 +232,7 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
             }
         }else {
             // Flood since we don't know the dst device
+            log.error("Fail to getRoute");
             doFlood(sw, pi, cntx);
         }
     }
