@@ -1,27 +1,5 @@
 package net.floodlightcontroller.linkCostService;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import org.openflow.protocol.OFPort;
-import org.openflow.protocol.OFStatisticsRequest;
-import org.openflow.protocol.statistics.OFPortStatisticsReply;
-import org.openflow.protocol.statistics.OFPortStatisticsRequest;
-import org.openflow.protocol.statistics.OFStatistics;
-import org.openflow.protocol.statistics.OFStatisticsType;
-import org.python.modules._hashlib.Hash;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.IOFSwitch.PortChangeType;
@@ -35,6 +13,19 @@ import net.floodlightcontroller.core.util.SingletonTask;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
+import org.openflow.protocol.OFPort;
+import org.openflow.protocol.OFStatisticsRequest;
+import org.openflow.protocol.statistics.OFPortStatisticsReply;
+import org.openflow.protocol.statistics.OFPortStatisticsRequest;
+import org.openflow.protocol.statistics.OFStatistics;
+import org.openflow.protocol.statistics.OFStatisticsType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		IOFSwitchListener {
@@ -51,6 +42,14 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	private Map<Long, Map<Short, List<Double>>> switchPortRateMap = new HashMap<Long, Map<Short, List<Double>>>();
 	private boolean initialFlag = true;
 
+	//光网络节点集合
+	private static Set<Long> FiberNodeSet = new HashSet<>();
+    //每个link的类型
+	private Map<Link, LinkType> linkTypeMap = new HashMap<>();
+
+	//当前网络中链路最大剩余带宽
+	private double MaxLinkCompacity;
+
 	/**
 	 * linkCost的getter方法
 	 * 
@@ -62,18 +61,17 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		return linkCost;
 	}
 
-
-	//运行LinkCostService
 	@Override
-	public void runLinkCostService() throws InterruptedException {
-		floodlightProvider.addOFSwitchListener(this);
-		mapTrafficToLinkCost();
-        Thread.sleep(5);
-        mapTrafficToLinkCost(); //  计算5s内的链路情况
-		updateLinkCost();
-	}
+	public Map<Link,LinkType> getLinkTypeMap(){
+	    return linkTypeMap;
+    }
 
-//	/**
+    @Override
+    public double getMaxLinkCompacity() {
+        return MaxLinkCompacity;
+    }
+
+    //	/**
 //	 * linkCostEnergySaving的getter方法
 //	 * @return
 //	 */
@@ -81,8 +79,19 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 //		return this.linkCostEnergySaving;
 //	}
 
+    /**
+     * 工具类：判断链路类型
+     */
+    public LinkType judgeLinkType(Link link){
+        long src = link.getSrc();
+        long dst = link.getDst();
+        if(FiberNodeSet.contains(src)&&FiberNodeSet.contains(dst))  return LinkType.FiberLink;
+        else return LinkType.CableLink;
+    }
+
+
 	/**
-	 * 更新linkCost的值
+	 * 更新linkCost的值以及linkType
 	 */
 	public void updateLinkCost() {
 		if (!initialFlag) {
@@ -92,6 +101,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
 				Iterator<Long> iteratorSwitchId = switchIds.iterator();
                 linkCost.clear();	//新增
+                MaxLinkCompacity = -1;   //重置最大链路容量
 				while (iteratorSwitchId.hasNext()) {
 					long dpid = iteratorSwitchId.next();
 					Set<Link> links = topologyLink.get(dpid);
@@ -102,7 +112,12 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 						long dpid1 = link.getSrc();
 						Double cost = switchPortRateMap.get(dpid1).get(
 								portNumber).get(0)+switchPortRateMap.get(dpid1).get(portNumber).get(1);   //选取链路源端口的发送速率和接收速率之和作为这个链路的链路权重
-						linkCost.put(link, cost);
+                        linkCost.put(link, cost);
+                        //更新链路类型，默认为CableLink
+                        linkTypeMap.put(link, judgeLinkType(link));
+                        if (MaxLinkCompacity < linkTypeMap.get(link).getBandwidth()-cost){
+                            MaxLinkCompacity = linkTypeMap.get(link).getBandwidth()-cost;
+                        }
 					}
 				}
 			}

@@ -2,7 +2,6 @@ package net.floodlightcontroller.forwarding;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
-import net.floodlightcontroller.core.IListener;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.annotations.LogMessageCategory;
 import net.floodlightcontroller.core.annotations.LogMessageDoc;
@@ -17,7 +16,10 @@ import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.loadbalancer.RouteByToS.IRouteByToS;
 import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.routing.*;
+import net.floodlightcontroller.routing.ForwardingBase;
+import net.floodlightcontroller.routing.IRoutingDecision;
+import net.floodlightcontroller.routing.IRoutingService;
+import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.topology.ITopologyService;
 import org.openflow.protocol.*;
 import org.openflow.protocol.action.OFAction;
@@ -26,9 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
-
-import static java.lang.Thread.sleep;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by Victor on 2017/2/26.
@@ -298,7 +301,6 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
 
         return;
     }
-
 
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleServices() {

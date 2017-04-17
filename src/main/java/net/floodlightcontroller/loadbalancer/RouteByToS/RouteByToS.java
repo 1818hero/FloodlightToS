@@ -6,19 +6,22 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.util.SingletonTask;
+import net.floodlightcontroller.counter.ICounterStoreService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.LinkInfo;
-import net.floodlightcontroller.routing.Link;
-import net.floodlightcontroller.routing.Route;
-import net.floodlightcontroller.routing.RouteId;
+import net.floodlightcontroller.routing.*;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.topology.NodePortTuple;
+import org.openflow.protocol.*;
+import org.openflow.protocol.action.OFAction;
+import org.openflow.protocol.action.OFActionOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,15 +35,31 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     private ILinkDiscoveryService linkDiscoveryManager;
     private ILinkCostService linkCostService;
     private IDeviceService deviceManager;
+    protected ICounterStoreService counterStore;
     private SingletonTask newInstanceTask;
-    //ToS分级数目
-    private static int ToSLevelNum = 6;
     //链路最大参考速率
     private static double MaxSpeed = 100;
     //链路最小门限因子
     private static double factor = 0.5;
 
 
+
+    // more flow-mod defaults
+    protected static short FLOWMOD_DEFAULT_IDLE_TIMEOUT = 5; // in seconds
+    protected static short FLOWMOD_DEFAULT_HARD_TIMEOUT = 0; // infinite
+    protected static short FLOWMOD_PRIORITY = 100;
+
+    //业务的带宽占用类型<ToS号，带宽占用>
+    private static Map<Byte, Double> BandwidthType = new HashMap<>();
+
+    //业务的丢包率要求<ToS号，丢包率要求百分比>
+    private static Map<Byte, Double> LossRateType = new HashMap<>();
+
+    //业务的时延要求
+    private static Map<Byte, Integer> DelayType = new HashMap<>();
+
+    //ToS分级数目
+    private static int ToSLevelNum ;
     //链路权重<链路，速率>
     private Map<Link, Double> linkCost;
     //预测链路权重<链路，速率>
@@ -59,11 +78,11 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     //拓扑中的交换机数目
     private int switchNum = 0;
     // 路由表，即ToS分级下的path
-    private List<List<List<Integer>>> routeTable;
+    private Map<Byte, List<List<Integer>>> routeTable;
     // 距离表，即ToS分级下的dist
-    private List<List<List<Integer>>> dist;
+    private Map<Byte, List<List<Integer>>> dist;
     // 路由结果
-    private List<Map<RouteId,Route>> routeCache;
+    private Map<Byte,Map<RouteId,Route>> routeCache = new HashMap<>();
     // 顶点集合
     private char[] mVexs;
     // ToS分级下的拓扑
@@ -222,17 +241,15 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
             log.error("LinkCost is null");
             return;
         }
-        double threshold = factor*MaxSpeed;
-//        if(TopoChanged||CostLevelChanged) {
-            double level = MaxSpeed*(1-factor)/ToSLevelNum;
+        //计算当前ToS下的拥塞门限
+            //double threshold = factor*MaxSpeed;
+            //double level = MaxSpeed*(1-factor)/ToSLevelNum;
             //不同ToS分级下的邻接矩阵(1表示邻接)
             List<List<Integer>> curTopoMatrix = new ArrayList<>();
             //初始化距离矩阵
-            dist = new ArrayList<>();
+            dist = new HashMap<>();
             //初始化总的routeTable
-            routeTable = new ArrayList<>();
-            //初始化总的routeCache(放到init中)
-            //routeCache = new ArrayList<>();
+            routeTable = new HashMap<>();
             //初始化邻接矩阵
             for(int i=0;i<switchNum;i++){
                 curTopoMatrix.add(new ArrayList<>(switchNum));
@@ -241,13 +258,14 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                     else    curTopoMatrix.get(i).add(0);
                 }
             }
-            for (int i = 0; i < ToSLevelNum; i++) {
+            for(Byte ToS : routeCache.keySet()){
+                double threshold = ThresholdCompute(ToS);
                 //初始化每一张routeTable、dist
-                routeTable.add(new ArrayList<>());
-                dist.add(new ArrayList<>());
+                routeTable.put(ToS, new ArrayList<>());
+                dist.put(ToS, new ArrayList<>());
                 //routeCache.add(new HashMap<RouteId,Route>());
-                List<List<Integer>> everyRouteTable = routeTable.get(i);
-                List<List<Integer>> everyDist = dist.get(i);
+                List<List<Integer>> everyRouteTable = routeTable.get(ToS);
+                List<List<Integer>> everyDist = dist.get(ToS);
 
                 for(int j=0;j<switchNum;j++){
                     everyRouteTable.add(new ArrayList<>(switchNum));
@@ -272,7 +290,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                 //Floyd算法计算该ToS下的最短路
                 floyd(everyRouteTable,everyDist,curTopoMatrix);
                 //将路由计算结果写入routeCache
-                Map<RouteId,Route> curCache = routeCache.get(i);
+                Map<RouteId,Route> curCache = routeCache.get(ToS);
                 //循环+递归更新路径cache
                 synchronized (curCache) {
                     curCache.clear();   //更新前应先删除当前级别的cache
@@ -282,9 +300,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                         }
                     }
                 }
-                threshold+=level;
+                //threshold+=level;
             }
- //       }
+
     }
 
     /**
@@ -322,7 +340,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                 Link link = TopoMatrix.get(src).get(nextHopIndex);
                 NodePortTuple srcNPT = new NodePortTuple(link.getSrc(),link.getSrcPort());
                 NodePortTuple nextHopNPT = new NodePortTuple(link.getDst(),link.getDstPort());
-                //必然只有这两种情况，否则我去吃屎
+
 //                if(link.getSrc()==IndexMap.get(src)){
 //                    srcNPT = new NodePortTuple(link.getSrc(),link.getSrcPort());
 //                    nextHopNPT = new NodePortTuple(link.getDst(),link.getDstPort());
@@ -336,6 +354,81 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                 Route tmp = new Route(curId,path);
                 tmp.setRouteCount(routeCount++);
                 curCache.put(curId,tmp);
+            }
+        }
+    }
+
+    /**
+     * 根据ToS计算threshold的工具类
+     */
+    private double ThresholdCompute(byte ToS){
+        try {
+            double RequiredBandwith = BandwidthType.get((ToS>>4)&(byte)3);
+            double RequiredLossRate = LossRateType.get((ToS>>2)&(byte)3);
+            int RequiredDelay = DelayType.get(ToS&(byte)3);
+            double basicThreshold = (1-RequiredLossRate)*RequiredBandwith;
+            int bucketNum = DelayType.size();
+            return basicThreshold+ RequiredDelay/bucketNum*(linkCostService.getMaxLinkCompacity()-basicThreshold);
+        }catch (Exception e){
+            log.warn("No suitable ToS found");
+            return 0.0;
+        }
+
+    }
+
+    /**
+     * 下发匹配各个ToS字段的FlowMod(借鉴LearningSwitch中的writeFlowMod)
+     *
+     * @return
+     */
+    private void writeFlowMod(IOFSwitch sw, short command, int bufferId,
+                              OFMatch match, short outPort) {
+
+        OFFlowMod flowMod = (OFFlowMod) floodlightProvider.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
+        flowMod.setMatch(match);
+        flowMod.setCookie(0);
+        flowMod.setCommand(command);
+        flowMod.setIdleTimeout(RouteByToS.FLOWMOD_DEFAULT_IDLE_TIMEOUT);
+        flowMod.setHardTimeout(RouteByToS.FLOWMOD_DEFAULT_HARD_TIMEOUT);
+        flowMod.setPriority(RouteByToS.FLOWMOD_PRIORITY);
+        flowMod.setBufferId(bufferId);
+        flowMod.setOutPort((command == OFFlowMod.OFPFC_DELETE) ? outPort : OFPort.OFPP_NONE.getValue());
+        flowMod.setFlags((command == OFFlowMod.OFPFC_DELETE) ? 0 : (short) (1 << 0)); // OFPFF_SEND_FLOW_REM
+        flowMod.setActions(Arrays.asList((OFAction) new OFActionOutput(outPort, (short) 0xffff)));
+        flowMod.setLength((short) (OFFlowMod.MINIMUM_LENGTH + OFActionOutput.MINIMUM_LENGTH));
+
+        if (log.isTraceEnabled()) {
+            log.trace("{} {} flow mod {}",
+                    new Object[]{ sw, (command == OFFlowMod.OFPFC_DELETE) ? "deleting" : "adding", flowMod });
+        }
+
+        counterStore.updatePktOutFMCounterStoreLocal(sw, flowMod);
+
+        // and write it out
+        try {
+            sw.write(flowMod, null);
+        } catch (IOException e) {
+            log.error("Failed to write {} to switch {}", new Object[]{ flowMod, sw }, e);
+        }
+    }
+
+    /**
+     * 遍历RouteCache后下发对应流表到各交换机(借鉴Forwarding中的pushRoute)
+     *
+     */
+    public void UpdateFlowTable(){
+        for(Byte ToS : routeCache.keySet()){
+            Map<RouteId, Route> routeMap = routeCache.get(ToS);
+            for(RouteId routeId : routeMap.keySet()){
+                Route route = routeMap.get(routeId);
+                List<NodePortTuple> path = route.getPath();
+                long src = routeId.getSrc();
+                long dst = routeId.getDst();
+                for (int i = 0; i < path.size(); i+=2) {
+                    long sw = path.get(i).getNodeId();
+                    String matchString = null;
+
+                }
             }
         }
     }
@@ -377,9 +470,30 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
         linkDiscoveryManager = context
                 .getServiceImpl(ILinkDiscoveryService.class);
         deviceManager = context.getServiceImpl(IDeviceService.class);
-        routeCache = new ArrayList<>();
-        for(int i=0;i<ToSLevelNum;i++){
-            routeCache.add(new HashMap<>());
+
+        //初始化各个ToS类型
+        //前两位
+        BandwidthType.put((byte)1, 10.0);    //1表示低带宽占用
+        BandwidthType.put((byte)2, 100.0);   //2表示高带宽占用
+        //中间两位
+        LossRateType.put((byte)0,1.0);       //0表示无要求
+        LossRateType.put((byte)1,0.6);       //1表示低丢包要求（允许丢包率较高）
+        LossRateType.put((byte)2,0.1);       //2表示高丢包要求（需要丢包率很低）
+        //后两位
+        DelayType.put((byte)0, 0);              //0表示高时延要求
+        DelayType.put((byte)1, 1);              //1表示低时延要求
+
+        //我不确定这个是不是需要，先写着吧
+        ToSLevelNum = BandwidthType.size()*LossRateType.size()*DelayType.size();
+
+        //初始化自定义ToS类型
+        for(Byte bandwith : BandwidthType.keySet()){
+            for(Byte lossRate : LossRateType.keySet()){
+                for(Byte delay : DelayType.keySet()){
+                    byte ToS = (byte)((bandwith<<4)|(lossRate<<2)|delay);
+                    routeCache.put(ToS,new HashMap<>());
+                }
+            }
         }
     }
 
@@ -400,11 +514,11 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
                }catch (Exception e){
                    log.error("exception",e);
                }finally{
-                   newInstanceTask.reschedule(20, TimeUnit.SECONDS);
+                   newInstanceTask.reschedule(30, TimeUnit.SECONDS);
                }
            }
         });
-        newInstanceTask.reschedule(20, TimeUnit.SECONDS);
+        newInstanceTask.reschedule(30, TimeUnit.SECONDS);
     }
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, int TosLevel, boolean tunnelEnabled){
@@ -496,4 +610,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     public boolean routeExists(long src, long dst, boolean tunnelEnabled) {
         return false;
     }
+
+
 }
