@@ -71,6 +71,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     private Map<Long, Integer>  dpIdMap;
     private Map<Integer, Long>  IndexMap;
 
+    //IP地址对应的接入点
+    private Map<Integer, Long>  attachmentMap;
+
     //拓扑图(邻接矩阵形式)
     private List<List<Link>> TopoMatrix;
     //拓扑中的设备

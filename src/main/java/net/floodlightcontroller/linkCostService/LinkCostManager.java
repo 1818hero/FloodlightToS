@@ -45,7 +45,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	//光网络节点集合
 	private static Set<Long> FiberNodeSet = new HashSet<>();
     //每个link的类型
-	private Map<Link, LinkType> linkTypeMap = new HashMap<>();
+	private Map<Link, LinkBandwidthType> linkTypeMap = new HashMap<>();
 
 	//当前网络中链路最大剩余带宽
 	private double MaxLinkCompacity;
@@ -62,7 +62,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	}
 
 	@Override
-	public Map<Link,LinkType> getLinkTypeMap(){
+	public Map<Link,LinkBandwidthType> getLinkTypeMap(){
 	    return linkTypeMap;
     }
 
@@ -82,11 +82,11 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
     /**
      * 工具类：判断链路类型
      */
-    public LinkType judgeLinkType(Link link){
+    public LinkBandwidthType judgeLinkType(Link link){
         long src = link.getSrc();
         long dst = link.getDst();
-        if(FiberNodeSet.contains(src)&&FiberNodeSet.contains(dst))  return LinkType.FiberLink;
-        else return LinkType.CableLink;
+        if(FiberNodeSet.contains(src)&&FiberNodeSet.contains(dst))  return LinkBandwidthType.FiberLink;
+        else return LinkBandwidthType.CableLink;
     }
 
 

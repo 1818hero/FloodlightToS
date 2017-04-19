@@ -1834,7 +1834,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
 
         // Write only direct links. Do not write links to external
         // L2 network.
-        // if (type != LinkType.DIRECT_LINK && type != LinkType.TUNNEL) {
+        // if (type != LinkBandwidthType.DIRECT_LINK && type != LinkBandwidthType.TUNNEL) {
         // return;
         // }
 
