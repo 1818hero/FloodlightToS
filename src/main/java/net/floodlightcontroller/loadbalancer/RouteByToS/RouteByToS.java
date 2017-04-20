@@ -1,6 +1,9 @@
 package net.floodlightcontroller.loadbalancer.RouteByToS;
 
-import net.floodlightcontroller.core.*;
+import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IFloodlightProviderService;
+import net.floodlightcontroller.core.IOFMessageListener;
+import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
@@ -9,12 +12,16 @@ import net.floodlightcontroller.core.util.SingletonTask;
 import net.floodlightcontroller.counter.ICounterStoreService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
+import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.LinkInfo;
-import net.floodlightcontroller.routing.*;
+import net.floodlightcontroller.routing.Link;
+import net.floodlightcontroller.routing.Route;
+import net.floodlightcontroller.routing.RouteId;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.topology.NodePortTuple;
+import net.floodlightcontroller.util.OFMessageDamper;
 import org.openflow.protocol.*;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
@@ -29,13 +36,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by Victor on 2017/2/8.
  */
-public class RouteByToS implements IFloodlightModule, IRouteByToS{
+public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageListener{
     private IFloodlightProviderService floodlightProvider;
     private IThreadPoolService threadPool;
     private ILinkDiscoveryService linkDiscoveryManager;
     private ILinkCostService linkCostService;
     private IDeviceService deviceManager;
     protected ICounterStoreService counterStore;
+    protected OFMessageDamper messageDamper;
     private SingletonTask newInstanceTask;
     //链路最大参考速率
     private static double MaxSpeed = 100;
@@ -45,6 +53,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
 
 
     // more flow-mod defaults
+    protected static int OFMESSAGE_DAMPER_CAPACITY = 10000; // TODO: find sweet spot
+    protected static int OFMESSAGE_DAMPER_TIMEOUT = 250; // ms
     protected static short FLOWMOD_DEFAULT_IDLE_TIMEOUT = 5; // in seconds
     protected static short FLOWMOD_DEFAULT_HARD_TIMEOUT = 0; // infinite
     protected static short FLOWMOD_PRIORITY = 100;
@@ -461,11 +471,17 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
 
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleDependencies() {
-        return null;
+        Collection<Class<? extends IFloodlightService>> l =
+                new ArrayList<Class<? extends IFloodlightService>>();
+        l.add(IFloodlightProviderService.class);
+        return l;
     }
 
     @Override
     public void init(FloodlightModuleContext context) throws FloodlightModuleException {
+        messageDamper = new OFMessageDamper(OFMESSAGE_DAMPER_CAPACITY,
+                EnumSet.of(OFType.FLOW_MOD),
+                OFMESSAGE_DAMPER_TIMEOUT);
         floodlightProvider = context
                 .getServiceImpl(IFloodlightProviderService.class);
         threadPool = context.getServiceImpl(IThreadPoolService.class);
@@ -503,6 +519,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
         wholeTopology = new HashMap<Long, Set<Link>>();
+        floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
         ScheduledExecutorService ses = threadPool.getScheduledExecutor();
         newInstanceTask = new SingletonTask(ses, new Runnable(){
            public void run(){
@@ -615,4 +632,39 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS{
     }
 
 
+    @Override
+    public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+        if(msg.getType()==OFType.PACKET_IN&&cntx!=null) {
+            IDevice dstDevice = IDeviceService.fcStore.
+                            get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
+            IDevice srcDevice = IDeviceService.fcStore.
+                            get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
+            if (dstDevice != null) {
+                Integer[] IPs = dstDevice.getIPv4Addresses();
+                SwitchPort[] Daps = dstDevice.getAttachmentPoints();
+            }
+            if (srcDevice != null) {
+                Integer[] IPs = dstDevice.getIPv4Addresses();
+                SwitchPort[] Daps = dstDevice.getAttachmentPoints();
+            }
+        }
+        return Command.CONTINUE;
+    }
+
+    @Override
+    public String getName() {
+        return "RouteByToS";
+    }
+
+    @Override
+    public boolean isCallbackOrderingPrereq(OFType type, String name) {
+        return (type.equals(OFType.PACKET_IN) &&
+                (name.equals("topology") ||
+                        name.equals("devicemanager")));
+    }
+
+    @Override
+    public boolean isCallbackOrderingPostreq(OFType type, String name) {
+        return false;
+    }
 }
