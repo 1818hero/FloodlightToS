@@ -168,14 +168,14 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
 
             byte DSCP = match.getNetworkTypeOfService();
             //ToS计算规则
-            int ToSLevel = (DSCP&0x03)+((DSCP>>2)&0x03)+((DSCP>>4)&0x03);
+            //int ToSLevel = (DSCP&0x03)+((DSCP>>2)&0x03)+((DSCP>>4)&0x03);
             int PathCost = INF;
             SwitchPort pickedSrc = null;
             SwitchPort pickedDst = null;
             //从所有接入点中选择路径最短的一条
             for(SwitchPort srcDap : srcDaps){
                 for(SwitchPort dstDap : dstDaps){
-                    Route r = router.getRoute(srcDap.getSwitchDPID(), dstDap.getSwitchDPID(), 0, ToSLevel, true);
+                    Route r = router.getRoute(srcDap.getSwitchDPID(), dstDap.getSwitchDPID(), 0, DSCP, true);
                     if(r!=null){
                         if(r.getRouteCount()<PathCost){
                             PathCost = r.getRouteCount();
@@ -193,7 +193,7 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
                     (short)pickedSrc.getPort(),
                     pickedDst.getSwitchDPID(),
                     (short)pickedDst.getPort(),
-                    0,ToSLevel,true);
+                    0,DSCP,true);
 
             if (route != null) {
                 if (log.isTraceEnabled()) {

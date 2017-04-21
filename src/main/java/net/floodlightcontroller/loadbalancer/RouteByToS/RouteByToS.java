@@ -81,9 +81,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     private Map<Long, Integer>  dpIdMap;
     private Map<Integer, Long>  IndexMap;
 
-    //IP地址对应的接入点
-    private Map<Integer, Long>  attachmentMap;
-
     //拓扑图(邻接矩阵形式)
     private List<List<Link>> TopoMatrix;
     //拓扑中的设备
@@ -95,7 +92,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     // 距离表，即ToS分级下的dist
     private Map<Byte, List<List<Integer>>> dist;
     // 路由结果
-    private Map<Byte,Map<RouteId,Route>> routeCache = new HashMap<>();
+    private TreeMap<Byte,Map<RouteId,Route>> routeCache = new TreeMap<>();
+    //IP地址对应的接入点
+    private Map<Integer, SwitchPort>  attachmentMap = new HashMap<>();
     // 顶点集合
     private char[] mVexs;
     // ToS分级下的拓扑
@@ -388,6 +387,18 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         }
 
     }
+    /**
+     * 生成默认OFMatch的工具类
+     * 参考pushStaticVipRoute
+     */
+    private OFMatch matchGenerate(Integer dstIP, byte ToS){
+        String matchString = null;
+        matchString = "nw_dst="+dstIP+","
+                    + "nw_tos="+ToS;
+        OFMatch ofMatch = new OFMatch();
+        ofMatch.fromString(matchString);
+        return ofMatch;
+    }
 
     /**
      * 下发匹配各个ToS字段的FlowMod(借鉴LearningSwitch中的writeFlowMod)
@@ -426,11 +437,36 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     }
 
     /**
-     * 遍历RouteCache后下发对应流表到各交换机(借鉴Forwarding中的pushRoute)
-     *
+     * 遍历查找所有接入主机的路由，并下发对应流表到各交换机(借鉴Forwarding中的pushRoute)
+     * 借鉴pushRoute()的写法
      */
     public void UpdateFlowTable(){
         for(Byte ToS : routeCache.keySet()){
+            Set<Integer> IPSet = attachmentMap.keySet();
+            for(Integer IpSrc : IPSet){
+                for(Integer IpDst : IPSet){
+                    if(IpDst.equals(IpSrc)) continue;
+                    SwitchPort dst = attachmentMap.get(IpDst);
+                    SwitchPort src = attachmentMap.get(IpSrc);
+
+                    Route route = getRoute(src.getSwitchDPID(),(short)src.getPort(),
+                                            dst.getSwitchDPID(),(short)dst.getPort(),
+                                            0,ToS,true);
+                    List<NodePortTuple> path = route.getPath();
+                    for(int indx = path.size()-1; indx>0;indx-=2){
+                        long switchDPID = path.get(indx).getNodeId();
+                        IOFSwitch sw = floodlightProvider.getSwitch(switchDPID);
+                        if (sw == null) {
+                            if (log.isWarnEnabled()) {
+                                log.warn("Unable to push route, switch at DPID {} " +
+                                        "not available", switchDPID);
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+
             Map<RouteId, Route> routeMap = routeCache.get(ToS);
             for(RouteId routeId : routeMap.keySet()){
                 Route route = routeMap.get(routeId);
@@ -440,6 +476,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                 for (int i = 0; i < path.size(); i+=2) {
                     long sw = path.get(i).getNodeId();
                     String matchString = null;
+
 
                 }
             }
@@ -541,7 +578,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         newInstanceTask.reschedule(30, TimeUnit.SECONDS);
     }
     @Override
-    public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, int TosLevel, boolean tunnelEnabled){
+    public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, Byte TosLevel, boolean tunnelEnabled){
         // Return null the route source and desitnation are the
         // same switchports.
         if (srcId == dstId && srcPort == dstPort)
@@ -567,25 +604,24 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         return r;
     }
     @Override
-    public Route getRoute(long src, long dst, long cookie, int ToSLevel, boolean tunnelEnabled){
+    public Route getRoute(long src, long dst, long cookie, Byte ToS, boolean tunnelEnabled){
         if(src==dst) return null;
         RouteId id = new RouteId(src, dst);
         Route result = null;
-        int i=ToSLevel;
-        if(i>ToSLevelNum) i=ToSLevelNum;    //如果包对应的级别超过ToSLevel总数，则按最高级别选择路由
+        Byte curToS = routeCache.floorKey(ToS);
         while(result==null) {
             try {
-                Map<RouteId, Route> curCache = routeCache.get(i);
+                Map<RouteId, Route> curCache = routeCache.get(curToS);    //对于不准确的ToS，查找最相邻的
                 if (curCache.containsKey(id)) {
                     result = curCache.get(id);
-                } else if (i < ToSLevelNum) {   //如果当前级别不存在路径就提高ToS级别
-                    i++;
+                } else if (curToS>0) {   //如果当前级别不存在路径就降低ToS级别
+                    --curToS;
                 } else {
-                    log.error("Route not found");
+                    log.warn("Route not found");
                     return null;
                 }
             }catch (Exception e){
-                log.error("Route not found");
+                log.warn("Route not found");
                 return null;
             }
         }
@@ -603,17 +639,17 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     @Override
     public Route getRoute(long src, long dst, long cookie, boolean tunnelEnabled) {
         //tunnelEnabled和cookie未使用
-        return getRoute(src, dst, cookie, ToSLevelNum, true);    //默认最高级别
+        return getRoute(src, dst, cookie, (byte)0, true);    //默认最低级别
     }
 
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie) {
-        return getRoute(srcId, srcPort, dstId, dstPort, cookie, ToSLevelNum, true);//默认最高级别
+        return getRoute(srcId, srcPort, dstId, dstPort, cookie, (byte)0, true);//默认最低级别
     }
 
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, boolean tunnelEnabled) {
-        return getRoute(srcId, srcPort, dstId, dstPort, cookie, ToSLevelNum, true);//默认最高级别
+        return getRoute(srcId, srcPort, dstId, dstPort, cookie, (byte)0, true);
     }
 
     @Override
@@ -642,10 +678,17 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             if (dstDevice != null) {
                 Integer[] IPs = dstDevice.getIPv4Addresses();
                 SwitchPort[] Daps = dstDevice.getAttachmentPoints();
+                if(IPs!=null&&IPs[0]!=null&&Daps!=null&&Daps[0]!=null) {
+                    attachmentMap.put(IPs[0], Daps[0]);
+                }
             }
+
             if (srcDevice != null) {
-                Integer[] IPs = dstDevice.getIPv4Addresses();
-                SwitchPort[] Daps = dstDevice.getAttachmentPoints();
+                Integer[] IPs = srcDevice.getIPv4Addresses();
+                SwitchPort[] Daps = srcDevice.getAttachmentPoints();
+                if(IPs!=null&&IPs[0]!=null&&Daps!=null&&Daps[0]!=null) {
+                    attachmentMap.put(IPs[0], Daps[0]);
+                }
             }
         }
         return Command.CONTINUE;

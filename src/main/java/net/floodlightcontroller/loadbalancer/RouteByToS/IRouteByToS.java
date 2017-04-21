@@ -23,7 +23,7 @@ public interface IRouteByToS extends IFloodlightService, IRoutingService {
      * @param tunnelEnabled
      * @return
      */
-    public Route getRoute(long src, long dst, long cookie, int ToSLevel, boolean tunnelEnabled);
-    public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, int TosLevel, boolean tunnelEnabled);
+    public Route getRoute(long src, long dst, long cookie, Byte ToS, boolean tunnelEnabled);
+    public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, Byte ToS, boolean tunnelEnabled);
     public Map<Long, Set<Link>> getWholeTopology() ;
 }
