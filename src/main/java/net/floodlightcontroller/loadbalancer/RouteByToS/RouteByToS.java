@@ -391,13 +391,26 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
      * 生成默认OFMatch的工具类
      * 参考pushStaticVipRoute
      */
-    private OFMatch matchGenerate(Integer dstIP, byte ToS){
+    private OFMatch matchGenerate(Integer dstIP, byte ToS, IOFSwitch sw){
         String matchString = null;
         matchString = "nw_dst="+dstIP+","
                     + "nw_tos="+ToS;
         OFMatch ofMatch = new OFMatch();
         ofMatch.fromString(matchString);
-        return ofMatch;
+
+        // L2 only wildcard if there is no prior route decision
+        Integer wildcard_hints = null;
+        wildcard_hints = ((Integer) sw
+                .getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
+                .intValue()
+                & ~OFMatch.OFPFW_IN_PORT
+                & ~OFMatch.OFPFW_DL_VLAN
+                & ~OFMatch.OFPFW_DL_SRC
+                & ~OFMatch.OFPFW_DL_DST
+                & ~OFMatch.OFPFW_NW_SRC_MASK
+                & ~OFMatch.OFPFW_NW_DST_MASK;
+        return ofMatch.setWildcards(wildcard_hints.intValue());
+
     }
 
     /**
@@ -436,48 +449,52 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         }
     }
 
+
+
+
     /**
      * 遍历查找所有接入主机的路由，并下发对应流表到各交换机(借鉴Forwarding中的pushRoute)
      * 借鉴pushRoute()的写法
      */
     public void UpdateFlowTable(){
         for(Byte ToS : routeCache.keySet()){
-            Set<Integer> IPSet = attachmentMap.keySet();
+            Byte curToS = ToS;                              //用于在没有合适路由的情况下改变路由级别
+            Set<Integer> IPSet = attachmentMap.keySet();    //遍历所有登记过的主机地址
             for(Integer IpSrc : IPSet){
-                for(Integer IpDst : IPSet){
-                    if(IpDst.equals(IpSrc)) continue;
+                for(Integer IpDst : IPSet) {
+                    if (IpDst.equals(IpSrc)) continue;
                     SwitchPort dst = attachmentMap.get(IpDst);
                     SwitchPort src = attachmentMap.get(IpSrc);
 
-                    Route route = getRoute(src.getSwitchDPID(),(short)src.getPort(),
-                                            dst.getSwitchDPID(),(short)dst.getPort(),
-                                            0,ToS,true);
-                    List<NodePortTuple> path = route.getPath();
-                    for(int indx = path.size()-1; indx>0;indx-=2){
-                        long switchDPID = path.get(indx).getNodeId();
-                        IOFSwitch sw = floodlightProvider.getSwitch(switchDPID);
-                        if (sw == null) {
-                            if (log.isWarnEnabled()) {
-                                log.warn("Unable to push route, switch at DPID {} " +
-                                        "not available", switchDPID);
+                    while (curToS-- > 0){
+                        Route route = getRoute(src.getSwitchDPID(), (short) src.getPort(),
+                                dst.getSwitchDPID(), (short) dst.getPort(),
+                                0, curToS, true);
+
+                        //如果当前ToS下有合适的链路
+                        if (route != null) {
+                            List<NodePortTuple> path = route.getPath();
+
+                            for (int indx = path.size() - 1; indx > 0; indx -= 2) {
+                                long switchDPID = path.get(indx).getNodeId();
+                                IOFSwitch sw = floodlightProvider.getSwitch(switchDPID);
+                                if (sw == null) {
+                                    if (log.isWarnEnabled()) {
+                                        log.warn("Unable to push route, switch at DPID {} " +
+                                                "not available", switchDPID);
+                                    }
+                                    break;
+                                }
+                                OFMatch match = matchGenerate(IpDst, ToS, sw);
+                                short outPort = path.get(indx).getPortId();
+                                writeFlowMod(sw, OFFlowMod.OFPFC_ADD, OFPacketOut.BUFFER_ID_NONE, match, outPort);
+
                             }
-                            continue;
+                            break;
                         }
+                        if(curToS>0)    log.info("No matched route for current ToS , auto decrease ToS level to {}",curToS);
+                        else            log.warn("No matched route in route cache");
                     }
-                }
-            }
-
-            Map<RouteId, Route> routeMap = routeCache.get(ToS);
-            for(RouteId routeId : routeMap.keySet()){
-                Route route = routeMap.get(routeId);
-                List<NodePortTuple> path = route.getPath();
-                long src = routeId.getSrc();
-                long dst = routeId.getDst();
-                for (int i = 0; i < path.size(); i+=2) {
-                    long sw = path.get(i).getNodeId();
-                    String matchString = null;
-
-
                 }
             }
         }
@@ -566,6 +583,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                    copySwitchLinks();  //获取拓扑
                    predictLinkCost = linkCost;     //暂时先这么写
                    routeCompute();
+                   UpdateFlowTable();
                    //allDevices = deviceManager.getAllDevices();
                    log.info("run RouteByToS");
                }catch (Exception e){
