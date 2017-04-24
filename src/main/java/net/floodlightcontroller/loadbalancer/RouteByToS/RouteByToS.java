@@ -16,6 +16,7 @@ import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.linkCostService.ILinkCostService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.LinkInfo;
+import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.routing.RouteId;
@@ -60,13 +61,13 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     protected static short FLOWMOD_PRIORITY = 100;
 
     //业务的带宽占用类型<ToS号，带宽占用>
-    private static Map<Byte, Double> BandwidthType = new HashMap<>();
+    private static Map<Integer, Double> BandwidthType = new HashMap<>();
 
     //业务的丢包率要求<ToS号，丢包率要求百分比>
-    private static Map<Byte, Double> LossRateType = new HashMap<>();
+    private static Map<Integer, Double> LossRateType = new HashMap<>();
 
     //业务的时延要求
-    private static Map<Byte, Integer> DelayType = new HashMap<>();
+    private static Map<Integer, Integer> DelayType = new HashMap<>();
 
     //ToS分级数目
     private static int ToSLevelNum ;
@@ -375,6 +376,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
      */
     private double ThresholdCompute(byte ToS){
         try {
+            System.out.print((ToS>>4)&(byte)3);
             double RequiredBandwith = BandwidthType.get((ToS>>4)&(byte)3);
             double RequiredLossRate = LossRateType.get((ToS>>2)&(byte)3);
             int RequiredDelay = DelayType.get(ToS&(byte)3);
@@ -393,10 +395,14 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
      */
     private OFMatch matchGenerate(Integer dstIP, byte ToS, IOFSwitch sw){
         String matchString = null;
-        matchString = "nw_dst="+dstIP+","
+        matchString = "nw_dst="+ IPv4.fromIPv4Address(dstIP)+","
                     + "nw_tos="+ToS;
         OFMatch ofMatch = new OFMatch();
-        ofMatch.fromString(matchString);
+        try {
+            ofMatch.fromString(matchString);
+        }catch (Exception e){
+            log.error("Fail to generate OFMatch");
+        }
 
         // L2 only wildcard if there is no prior route decision
         Integer wildcard_hints = null;
@@ -543,26 +549,27 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         linkDiscoveryManager = context
                 .getServiceImpl(ILinkDiscoveryService.class);
         deviceManager = context.getServiceImpl(IDeviceService.class);
+        counterStore = context.getServiceImpl(ICounterStoreService.class);
 
         //初始化各个ToS类型
         //前两位
-        BandwidthType.put((byte)1, 10.0);    //1表示低带宽占用
-        BandwidthType.put((byte)2, 100.0);   //2表示高带宽占用
+        BandwidthType.put(1, 10.0);    //1表示低带宽占用
+        BandwidthType.put(2, 100.0);   //2表示高带宽占用
         //中间两位
-        LossRateType.put((byte)0,1.0);       //0表示无要求
-        LossRateType.put((byte)1,0.6);       //1表示低丢包要求（允许丢包率较高）
-        LossRateType.put((byte)2,0.1);       //2表示高丢包要求（需要丢包率很低）
+        LossRateType.put(0,1.0);       //0表示无要求
+        LossRateType.put(1,0.6);       //1表示低丢包要求（允许丢包率较高）
+        LossRateType.put(2,0.1);       //2表示高丢包要求（需要丢包率很低）
         //后两位
-        DelayType.put((byte)0, 0);              //0表示高时延要求
-        DelayType.put((byte)1, 1);              //1表示低时延要求
+        DelayType.put(0, 0);              //0表示高时延要求
+        DelayType.put(1, 1);              //1表示低时延要求
 
         //我不确定这个是不是需要，先写着吧
         ToSLevelNum = BandwidthType.size()*LossRateType.size()*DelayType.size();
 
         //初始化自定义ToS类型
-        for(Byte bandwith : BandwidthType.keySet()){
-            for(Byte lossRate : LossRateType.keySet()){
-                for(Byte delay : DelayType.keySet()){
+        for(Integer bandwith : BandwidthType.keySet()){
+            for(Integer lossRate : LossRateType.keySet()){
+                for(Integer delay : DelayType.keySet()){
                     byte ToS = (byte)((bandwith<<4)|(lossRate<<2)|delay);
                     routeCache.put(ToS,new HashMap<>());
                 }
@@ -626,27 +633,20 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         if(src==dst) return null;
         RouteId id = new RouteId(src, dst);
         Route result = null;
-        Byte curToS = routeCache.floorKey(ToS);
-        while(result==null) {
-            try {
-                Map<RouteId, Route> curCache = routeCache.get(curToS);    //对于不准确的ToS，查找最相邻的
-                if (curCache.containsKey(id)) {
-                    result = curCache.get(id);
-                } else if (curToS>0) {   //如果当前级别不存在路径就降低ToS级别
-                    --curToS;
-                } else {
-                    log.warn("Route not found");
-                    return null;
+        try {
+            Map<RouteId, Route> curCache = routeCache.get(routeCache.floorKey(ToS));    //对于不准确的ToS，查找最相邻的
+            if (curCache.containsKey(id)) {
+                result = curCache.get(id);
+                if (log.isTraceEnabled()) {
+                    log.trace("getRoute: {} -> {}", id, result);
                 }
-            }catch (Exception e){
-                log.warn("Route not found");
-                return null;
+                return result;
             }
+        }catch (Exception e){
+            log.warn("Route not found");
+            return null;
         }
-        if (log.isTraceEnabled()) {
-            log.trace("getRoute: {} -> {}", id, result);
-        }
-        return result;
+        return null;
     }
 
     @Override
@@ -693,19 +693,27 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                             get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
             IDevice srcDevice = IDeviceService.fcStore.
                             get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
-            if (dstDevice != null) {
-                Integer[] IPs = dstDevice.getIPv4Addresses();
-                SwitchPort[] Daps = dstDevice.getAttachmentPoints();
-                if(IPs!=null&&IPs[0]!=null&&Daps!=null&&Daps[0]!=null) {
-                    attachmentMap.put(IPs[0], Daps[0]);
+            if (dstDevice != null&&dstDevice.getIPv4Addresses()!=null&&dstDevice.getIPv4Addresses().length!=0) {
+                try {
+                    Integer[] IPs = dstDevice.getIPv4Addresses();
+                    SwitchPort[] Daps = dstDevice.getAttachmentPoints();
+                    if(IPs!=null&&IPs.length>0&&Daps!=null&&Daps.length>0) {
+                        attachmentMap.put(IPs[0], Daps[0]);
+                    }
+                }catch (Exception e){
+                    log.error("dst Device error");
                 }
             }
 
-            if (srcDevice != null) {
-                Integer[] IPs = srcDevice.getIPv4Addresses();
-                SwitchPort[] Daps = srcDevice.getAttachmentPoints();
-                if(IPs!=null&&IPs[0]!=null&&Daps!=null&&Daps[0]!=null) {
-                    attachmentMap.put(IPs[0], Daps[0]);
+            if (srcDevice != null&&srcDevice.getIPv4Addresses()!=null&&srcDevice.getIPv4Addresses().length!=0) {
+                try {
+                    Integer[] IPs = srcDevice.getIPv4Addresses();
+                    SwitchPort[] Daps = srcDevice.getAttachmentPoints();
+                    if (IPs != null && IPs.length>0 && Daps != null && Daps.length>0) {
+                        attachmentMap.put(IPs[0], Daps[0]);
+                    }
+                }catch(Exception e){
+                    log.error("src Device error");
                 }
             }
         }
