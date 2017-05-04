@@ -293,9 +293,10 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                 //构造当前ToS下的拓扑邻接矩阵
                 for(Link link : linkSet){
                     double curLoad = predictLinkCost.get(link);
+                    double curLeftBandwidth = linkCostService.getLinkCompacity(link)-curLoad;
                     int srcIndex = dpIdMap.get(link.getSrc());
                     int dstIndex = dpIdMap.get(link.getDst());
-                    if(curLoad < threshold) {   //当未达到拥塞门限时则视为链路开放
+                    if(curLeftBandwidth >= threshold) {   //当剩余带宽大于等于门限，则链路开放
                         curTopoMatrix.get(srcIndex).set(dstIndex, 1);
                         curTopoMatrix.get(dstIndex).set(srcIndex, 1);
                     }
@@ -376,7 +377,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
      */
     private double ThresholdCompute(byte ToS){
         try {
-            System.out.print((ToS>>4)&(byte)3);
             double RequiredBandwith = BandwidthType.get((ToS>>4)&(byte)3);
             double RequiredLossRate = LossRateType.get((ToS>>2)&(byte)3);
             int RequiredDelay = DelayType.get(ToS&(byte)3);
@@ -553,6 +553,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
 
         //初始化各个ToS类型
         //前两位
+        BandwidthType.put(0, 0.0);     //0表示无带宽占用
         BandwidthType.put(1, 10.0);    //1表示低带宽占用
         BandwidthType.put(2, 100.0);   //2表示高带宽占用
         //中间两位
@@ -634,19 +635,19 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         RouteId id = new RouteId(src, dst);
         Route result = null;
         try {
+            //Byte tmp = routeCache.ceilingKey(ToS);
             Map<RouteId, Route> curCache = routeCache.get(routeCache.floorKey(ToS));    //对于不准确的ToS，查找最相邻的
-            if (curCache.containsKey(id)) {
-                result = curCache.get(id);
-                if (log.isTraceEnabled()) {
-                    log.trace("getRoute: {} -> {}", id, result);
-                }
-                return result;
+            //if (curCache.containsKey(id)) {
+            result = curCache.get(id);
+            if (log.isTraceEnabled()) {
+                log.trace("getRoute: {} -> {}", id, result);
             }
+            return result;
+           // }
         }catch (Exception e){
             log.warn("Route not found");
             return null;
         }
-        return null;
     }
 
     @Override

@@ -71,7 +71,17 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
         return MaxLinkCompacity;
     }
 
-    //	/**
+	@Override
+	public double getLinkCompacity(Link link) {
+		try {
+			return linkTypeMap.get(link).getBandwidth();
+		}catch (Exception e){
+			log.error("No such Link in current network");
+		}
+		return -1;
+	}
+
+	//	/**
 //	 * linkCostEnergySaving的getter方法
 //	 * @return
 //	 */
