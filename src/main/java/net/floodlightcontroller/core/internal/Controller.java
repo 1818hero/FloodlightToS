@@ -912,7 +912,7 @@ public class Controller implements IFloodlightProviderService,
             this.role = role;
             this.activeSwitches = new ConcurrentHashMap<Long, IOFSwitch>();
             this.syncedSwitches = new ConcurrentHashMap<Long, IOFSwitch>();
-       }
+        }
 
         @Override
         public void keysModified(Iterator<Long> keys, UpdateType type) {

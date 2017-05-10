@@ -50,6 +50,14 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	//当前网络中链路最大剩余带宽
 	private double MaxLinkCompacity;
 
+	//配置类：预先设定光节点set
+	private void setFiberNodeSet(){
+		FiberNodeSet.add(new Long(1));
+		FiberNodeSet.add(new Long(3));
+		FiberNodeSet.add(new Long(4));
+		FiberNodeSet.add(new Long(5));
+	}
+
 	/**
 	 * linkCost的getter方法
 	 * 
@@ -309,6 +317,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		threadPool = context.getServiceImpl(IThreadPoolService.class);
 		linkDiscoveryManager = context
 				.getServiceImpl(ILinkDiscoveryService.class);
+		setFiberNodeSet();
 	}
 
 	@Override

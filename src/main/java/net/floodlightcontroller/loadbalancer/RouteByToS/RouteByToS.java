@@ -314,7 +314,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                         }
                     }
                 }
-                //threshold+=level;
             }
 
     }
@@ -555,7 +554,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         //前两位
         BandwidthType.put(0, 0.0);     //0表示无带宽占用
         BandwidthType.put(1, 10.0);    //1表示低带宽占用
-        BandwidthType.put(2, 100.0);   //2表示高带宽占用
+        BandwidthType.put(2, 20.0);    //2表示高带宽占用
+        BandwidthType.put(3, 50.0);    //3表示极高带宽占用
         //中间两位
         LossRateType.put(0,1.0);       //0表示无要求
         LossRateType.put(1,0.6);       //1表示低丢包要求（允许丢包率较高）
