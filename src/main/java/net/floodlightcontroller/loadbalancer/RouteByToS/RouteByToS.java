@@ -14,6 +14,7 @@ import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.linkCostService.ILinkCostService;
+import net.floodlightcontroller.linkCostService.LinkBandwidthType;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.LinkInfo;
 import net.floodlightcontroller.packet.IPv4;
@@ -46,12 +47,6 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     protected ICounterStoreService counterStore;
     protected OFMessageDamper messageDamper;
     private SingletonTask newInstanceTask;
-    //链路最大参考速率
-    private static double MaxSpeed = 100;
-    //链路最小门限因子
-    private static double factor = 0.5;
-
-
 
     // more flow-mod defaults
     protected static int OFMESSAGE_DAMPER_CAPACITY = 10000; // TODO: find sweet spot
@@ -59,6 +54,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     protected static short FLOWMOD_DEFAULT_IDLE_TIMEOUT = 5; // in seconds
     protected static short FLOWMOD_DEFAULT_HARD_TIMEOUT = 0; // infinite
     protected static short FLOWMOD_PRIORITY = 100;
+
+    //当前网络中链路的最大容量
+    protected static double maxLinkCompacity;
 
     //业务的带宽占用类型<ToS号，带宽占用>
     private static Map<Integer, Double> BandwidthType = new HashMap<>();
@@ -71,12 +69,18 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
 
     //ToS分级数目
     private static int ToSLevelNum ;
+    //拓扑描述
+    Map<Long, Set<Link>> switchLinks = new HashMap<>();
+    Map<Link, LinkInfo> allLinks = new HashMap<>();
     //链路权重<链路，速率>
-    private Map<Link, Double> linkCost;
+    private Map<Link, Double> linkCost = new HashMap<>();
+    //链路带宽容量map
+    private Map<Link,LinkBandwidthType> linkTypeMap = new HashMap<>();
     //预测链路权重<链路，速率>
     private Map<Link, Double> predictLinkCost;
     //拓扑图<dpId, 链路>
     private Map<Long, Set<Link>> wholeTopology;
+
 
     //dpId和拓扑邻接矩阵下标之间的映射关系
     private Map<Long, Integer>  dpIdMap;
@@ -89,9 +93,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     //拓扑中的交换机数目
     private int switchNum = 0;
     // 路由表，即ToS分级下的path
-    private Map<Byte, List<List<Integer>>> routeTable;
+    //private Map<Byte, List<List<Integer>>> routeTable;
     // 距离表，即ToS分级下的dist
-    private Map<Byte, List<List<Integer>>> dist;
+    //private Map<Byte, List<List<Integer>>> dist;
     // 路由结果
     private TreeMap<Byte,Map<RouteId,Route>> routeCache = new TreeMap<>();
     //IP地址对应的接入点
@@ -111,8 +115,17 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
      * getSwitchLinks获得的是双工链路，这里将其视为一条
      */
     public void copySwitchLinks() {
-        Map<Long, Set<Link>> switchLinks = linkDiscoveryManager
-                .getSwitchLinks();
+        synchronized (linkCostService) {
+            linkCost.clear();
+            switchLinks.clear();
+            allLinks.clear();
+            linkTypeMap.clear();
+            switchLinks.putAll(linkCostService.getSwitchLinks());
+            allLinks.putAll(linkDiscoveryManager.getLinks());
+            linkCost.putAll(linkCostService.getLinkCost());  //获取链路速率
+            maxLinkCompacity = linkCostService.getMaxLinkCompacity();
+            linkTypeMap.putAll(linkCostService.getLinkTypeMap());
+        }
         //如果linkDiscoveryManager还未更新则不更新任何数据
         if(switchLinks==null||switchLinks.isEmpty())    return;
 //        Set<Long> keys = switchLinks.keySet();
@@ -154,12 +167,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             TopoMatrix.add(new ArrayList<>(switchNum));
             for(int j=0;j<switchNum;j++)   {
                 if(i!=j)    TopoMatrix.get(i).add(null);
-                else    TopoMatrix.get(i).add(new Link());  // 什么都没有的link表示自己连接自己
+                else        TopoMatrix.get(i).add(new Link());  // 什么都没有的link表示自己连接自己
             }
         }
-
-
-        Map<Link,LinkInfo> allLinks = linkDiscoveryManager.getLinks();
         //建立邻接矩阵形式的拓扑图
         for(Link link : allLinks.keySet()){
             int srcIndex = dpIdMap.get(link.getSrc());
@@ -254,15 +264,17 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             log.error("LinkCost is null");
             return;
         }
-        //计算当前ToS下的拥塞门限
-            //double threshold = factor*MaxSpeed;
-            //double level = MaxSpeed*(1-factor)/ToSLevelNum;
+        //初始化距离矩阵
+        //dist = new HashMap<>();
+        //初始化总的routeTable
+        //routeTable = new HashMap<>();
+        for(Byte ToS : routeCache.keySet()){
+            double threshold = ThresholdCompute(ToS);
+            //初始化每一张routeTable、dist
+            //routeTable.put(ToS, new ArrayList<>());
+            //dist.put(ToS, new ArrayList<>());
             //不同ToS分级下的邻接矩阵(1表示邻接)
             List<List<Integer>> curTopoMatrix = new ArrayList<>();
-            //初始化距离矩阵
-            dist = new HashMap<>();
-            //初始化总的routeTable
-            routeTable = new HashMap<>();
             //初始化邻接矩阵
             for(int i=0;i<switchNum;i++){
                 curTopoMatrix.add(new ArrayList<>(switchNum));
@@ -271,50 +283,47 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                     else    curTopoMatrix.get(i).add(0);
                 }
             }
-            for(Byte ToS : routeCache.keySet()){
-                double threshold = ThresholdCompute(ToS);
-                //初始化每一张routeTable、dist
-                routeTable.put(ToS, new ArrayList<>());
-                dist.put(ToS, new ArrayList<>());
-                //routeCache.add(new HashMap<RouteId,Route>());
-                List<List<Integer>> everyRouteTable = routeTable.get(ToS);
-                List<List<Integer>> everyDist = dist.get(ToS);
+            List<List<Integer>> curRouteTable = new ArrayList<>();
+            List<List<Integer>> curDist = new ArrayList<>();
 
-                for(int j=0;j<switchNum;j++){
-                    everyRouteTable.add(new ArrayList<>(switchNum));
-                    everyDist.add(new ArrayList<>(switchNum));
-                    //在floyd算法中还会被初始化
-                    for(int k=0;k<switchNum;k++){
-                        everyRouteTable.get(j).add(INF);
-                        everyDist.get(j).add(INF);
-                    }
+            //List<List<Integer>> everyRouteTable = routeTable.get(ToS);
+            //List<List<Integer>> everyDist = dist.get(ToS);
+
+            for(int j=0;j<switchNum;j++){
+                curRouteTable.add(new ArrayList<>(switchNum));
+                curDist.add(new ArrayList<>(switchNum));
+                //在floyd算法中还会被初始化
+                for(int k=0;k<switchNum;k++){
+                    curRouteTable.get(j).add(INF);
+                    curDist.get(j).add(INF);
                 }
-                Set<Link> linkSet = predictLinkCost.keySet();
-                //构造当前ToS下的拓扑邻接矩阵
-                for(Link link : linkSet){
-                    double curLoad = predictLinkCost.get(link);
-                    double curLeftBandwidth = linkCostService.getLinkCompacity(link)-curLoad;
-                    int srcIndex = dpIdMap.get(link.getSrc());
-                    int dstIndex = dpIdMap.get(link.getDst());
-                    if(curLeftBandwidth >= threshold) {   //当剩余带宽大于等于门限，则链路开放
-                        curTopoMatrix.get(srcIndex).set(dstIndex, 1);
-                        curTopoMatrix.get(dstIndex).set(srcIndex, 1);
-                    }
+            }
+            Set<Link> linkSet = predictLinkCost.keySet();
+            //构造当前ToS下的拓扑邻接矩阵
+            for(Link link : linkSet){
+                double curLoad = predictLinkCost.get(link);
+                double curLeftBandwidth =  linkTypeMap.get(link).getBandwidth()-curLoad;
+                int srcIndex = dpIdMap.get(link.getSrc());
+                int dstIndex = dpIdMap.get(link.getDst());
+                if(curLeftBandwidth >= threshold) {   //当剩余带宽大于等于门限，则链路开放
+                    curTopoMatrix.get(srcIndex).set(dstIndex, 1);
+                    curTopoMatrix.get(dstIndex).set(srcIndex, 1);
                 }
-                //Floyd算法计算该ToS下的最短路
-                floyd(everyRouteTable,everyDist,curTopoMatrix);
-                //将路由计算结果写入routeCache
-                Map<RouteId,Route> curCache = routeCache.get(ToS);
-                //循环+递归更新路径cache
-                synchronized (curCache) {
-                    curCache.clear();   //更新前应先删除当前级别的cache
-                    for (int src = 0; src < switchNum; src++) {
-                        for (int dst = 0; dst < switchNum; dst++) {
-                            addCache(src, dst, curCache, everyDist, everyRouteTable);
-                        }
+            }
+            //Floyd算法计算该ToS下的最短路
+            floyd(curRouteTable,curDist,curTopoMatrix);
+            //将路由计算结果写入routeCache
+            Map<RouteId,Route> curCache = routeCache.get(ToS);
+            //循环+递归更新路径cache
+            synchronized (curCache) {
+                curCache.clear();   //更新前应先删除当前级别的cache
+                for (int src = 0; src < switchNum; src++) {
+                    for (int dst = 0; dst < switchNum; dst++) {
+                        addCache(src, dst, curCache, curDist, curRouteTable);
                     }
                 }
             }
+        }
 
     }
 
@@ -582,26 +591,49 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
         wholeTopology = new HashMap<Long, Set<Link>>();
         floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
-        ScheduledExecutorService ses = threadPool.getScheduledExecutor();
-        newInstanceTask = new SingletonTask(ses, new Runnable(){
-           public void run(){
-               try {
-                   //linkCostService.runLinkCostService();
-                   linkCost = linkCostService.getLinkCost();   //获取链路速率
-                   copySwitchLinks();  //获取拓扑
-                   predictLinkCost = linkCost;     //暂时先这么写
-                   routeCompute();
-                   UpdateFlowTable();
-                   //allDevices = deviceManager.getAllDevices();
-                   log.info("run RouteByToS");
-               }catch (Exception e){
-                   log.error("exception",e);
-               }finally{
-                   newInstanceTask.reschedule(30, TimeUnit.SECONDS);
-               }
-           }
+
+
+//        ScheduledExecutorService ses = threadPool.getScheduledExecutor();
+//        newInstanceTask = new SingletonTask(ses, new Runnable(){
+//           public void run(){
+//               try {
+//                   //linkCostService.runLinkCostService();
+//                   copySwitchLinks();  //获取拓扑
+//                   linkCost = linkCostService.getLinkCost();   //获取链路速率
+//                   predictLinkCost = linkCost;     //暂时先这么写
+//                   routeCompute();
+//                   UpdateFlowTable();
+//                   //allDevices = deviceManager.getAllDevices();
+//                   log.info("run RouteByToS");
+//               }catch (Exception e){
+//                   log.error("exception",e);
+//               }finally{
+//                   newInstanceTask.reschedule(30, TimeUnit.SECONDS);
+//               }
+//           }
+//        });
+//        newInstanceTask.reschedule(5, TimeUnit.SECONDS);
+
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                   while(true) {
+                       copySwitchLinks();  //获取拓扑
+                       predictLinkCost = linkCost;     //暂时先这么写
+                       routeCompute();
+                       UpdateFlowTable();
+                       //allDevices = deviceManager.getAllDevices();
+                       log.info("run RouteByToS");
+                       try {
+                           Thread.sleep(5000);
+                       } catch (InterruptedException e) {
+                           e.printStackTrace();
+                       }
+                   }
+
+            }
         });
-        newInstanceTask.reschedule(30, TimeUnit.SECONDS);
+        t.start();
     }
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, Byte TosLevel, boolean tunnelEnabled){

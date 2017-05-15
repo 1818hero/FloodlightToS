@@ -50,6 +50,10 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	//当前网络中链路最大剩余带宽
 	private double MaxLinkCompacity;
 
+	//当前的拓扑信息
+    private Map<Long, IOFSwitch> switchMap = new HashMap<>();
+    private Map<Long, Set<Link>> switchLinks = new HashMap<>();
+
 	//配置类：预先设定光节点set
 	private void setFiberNodeSet(){
 		FiberNodeSet.add(new Long(1));
@@ -65,22 +69,22 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	 */
 	// getter of linkCost
 	@Override
-	public Map<Link,Double> getLinkCost() {
+	public synchronized Map<Link,Double> getLinkCost() {
 		return linkCost;
 	}
 
 	@Override
-	public Map<Link,LinkBandwidthType> getLinkTypeMap(){
+	public synchronized Map<Link,LinkBandwidthType> getLinkTypeMap(){
 	    return linkTypeMap;
     }
 
     @Override
-    public double getMaxLinkCompacity() {
+    public synchronized double getMaxLinkCompacity() {
         return MaxLinkCompacity;
     }
 
 	@Override
-	public double getLinkCompacity(Link link) {
+	public synchronized double getLinkCompacity(Link link) {
 		try {
 			return linkTypeMap.get(link).getBandwidth();
 		}catch (Exception e){
@@ -89,7 +93,12 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		return -1;
 	}
 
-	//	/**
+    @Override
+    public Map<Long, Set<Link>> getSwitchLinks() {
+        return this.switchLinks;
+    }
+
+    //	/**
 //	 * linkCostEnergySaving的getter方法
 //	 * @return
 //	 */
@@ -111,18 +120,16 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	/**
 	 * 更新linkCost的值以及linkType
 	 */
-	public void updateLinkCost() {
+	public synchronized void updateLinkCost() {
 		if (!initialFlag) {
 			synchronized (switchPortRateMap) {
-				Map<Long, Set<Link>> topologyLink = linkDiscoveryManager
-						.getSwitchLinks();
-				Set<Long> switchIds = topologyLink.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
+				Set<Long> switchIds = switchLinks.keySet(); // 虽然给出的文档中key是switchId，但是并不能完全对应与link中dpid，为正确还是使用link中的dpid
 				Iterator<Long> iteratorSwitchId = switchIds.iterator();
                 linkCost.clear();	//新增
                 MaxLinkCompacity = -1;   //重置最大链路容量
 				while (iteratorSwitchId.hasNext()) {
 					long dpid = iteratorSwitchId.next();
-					Set<Link> links = topologyLink.get(dpid);
+					Set<Link> links = switchLinks.get(dpid);
 					Iterator<Link> iteratorLink = links.iterator();
 					while (iteratorLink.hasNext()) {
 						Link link = iteratorLink.next();
@@ -178,8 +185,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 //		if (!initialFlag) { // 当要进行更新linkCost时，就删除linkCost；
 //			linkCost.clear();
 //		}
-		Map<Long, List<OFStatistics>> netTraffic = new HashMap<Long, List<OFStatistics>>();
-		netTraffic = this.collectTraffic();
+		Map<Long, List<OFStatistics>> netTraffic = this.collectTraffic();
 		Set<Long> dpids = netTraffic.keySet(); // 网络中的所有的交换机的dpid；
 
 		Iterator<Long> dpidIterator = dpids.iterator();
@@ -246,7 +252,7 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	public Map<Long, List<OFStatistics>> collectTraffic() {
 
 		// 获取控制器所连接的所有的交换机的集合
-		Set<Long> switchSet = floodlightProvider.getAllSwitchMap().keySet();
+		Set<Long> switchSet = switchMap.keySet();
 		Iterator<Long> iter = switchSet.iterator();
 		// 网络中的流量信息
 		Map<Long, List<OFStatistics>> networkTrafficTemp = new HashMap<Long, List<OFStatistics>>();
@@ -329,6 +335,10 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 		// 以T=5为周期进行链路权值的更新操作，这个动作时一直都在进行的；
 		newInstanceTask = new SingletonTask(ses, new Runnable() {
 			public void run() {
+			    switchMap.clear();
+			    switchLinks.clear();
+                switchMap.putAll(floodlightProvider.getAllSwitchMap());
+                switchLinks.putAll(linkDiscoveryManager.getSwitchLinks());
 				try {
 					mapTrafficToLinkCost();
 					updateLinkCost();
