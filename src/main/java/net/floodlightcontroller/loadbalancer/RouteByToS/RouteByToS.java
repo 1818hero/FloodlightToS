@@ -32,8 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Victor on 2017/2/8.
@@ -107,8 +105,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     // 最大值
     private static final int INF = Integer.MAX_VALUE;
 
-    protected static Logger log = LoggerFactory
-            .getLogger(RouteByToS.class);
+    protected static Logger log = LoggerFactory.getLogger(RouteByToS.class);
 
     /**
      * 完成对网络拓扑信息的复制, 将网络的初始拓扑保存下来
@@ -121,7 +118,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             allLinks.clear();
             linkTypeMap.clear();
             switchLinks.putAll(linkCostService.getSwitchLinks());
-            allLinks.putAll(linkDiscoveryManager.getLinks());
+            allLinks.putAll(linkCostService.getLinks());
             linkCost.putAll(linkCostService.getLinkCost());  //获取链路速率
             maxLinkCompacity = linkCostService.getMaxLinkCompacity();
             linkTypeMap.putAll(linkCostService.getLinkTypeMap());
@@ -306,8 +303,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                 int srcIndex = dpIdMap.get(link.getSrc());
                 int dstIndex = dpIdMap.get(link.getDst());
                 if(curLeftBandwidth >= threshold) {   //当剩余带宽大于等于门限，则链路开放
-                    curTopoMatrix.get(srcIndex).set(dstIndex, 1);
-                    curTopoMatrix.get(dstIndex).set(srcIndex, 1);
+                    if(allLinks.containsKey(link)) curTopoMatrix.get(srcIndex).set(dstIndex, 1);
+                    //curTopoMatrix.get(dstIndex).set(srcIndex, 1);
                 }
             }
             //Floyd算法计算该ToS下的最短路
@@ -384,11 +381,15 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             double RequiredLossRate = LossRateType.get((ToS>>3)&(byte)1);
             int RequiredDelay = DelayType.get(ToS&(byte)7);
             double basicThreshold = (1-RequiredLossRate)*RequiredBandwith;
-            double diff = linkCostService.getMaxLinkCompacity()-basicThreshold;
+            double diff = maxLinkCompacity-basicThreshold;
             int bucketNum = Math.min((int)(diff/BandwidthType.get(1)),DelayType.size());
-            for (double i=1.0;i<=bucketNum;i++){
-                if((double)RequiredDelay/DelayType.size()>i/bucketNum)   return basicThreshold+i/bucketNum*diff;
+            //匹配桶的区域
+            for (double i=bucketNum-1.0;i>=0.0;i--){
+                if((double)RequiredDelay/DelayType.size()>=i/bucketNum)  return  basicThreshold+i/bucketNum*diff;
             }
+//            for (double i=1.0;i<=bucketNum;i++){
+//                if((double)RequiredDelay/DelayType.size()>i/bucketNum)   return  basicThreshold+i/bucketNum*diff;
+//            }
             return basicThreshold;
         }catch (Exception e){
             log.warn("No suitable ToS found");
@@ -561,21 +562,21 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         //初始化各个ToS类型
         //前两位
         BandwidthType.put(0, 0.0);     //0表示无带宽占用
-        BandwidthType.put(1, 10.0);    //1表示低带宽占用
-        BandwidthType.put(2, 20.0);    //2表示高带宽占用
-        BandwidthType.put(3, 50.0);    //3表示极高带宽占用
+        BandwidthType.put(1, 1.0);    //1表示低带宽占用
+        BandwidthType.put(2, 5.0);    //2表示高带宽占用
+        BandwidthType.put(3, 8.0);    //3表示极高带宽占用
         //中间一位
         LossRateType.put(0,1.0);       //0表示无要求
         LossRateType.put(1,0.0);       //1表示有要求
         //后三位
         DelayType.put(0, 0);           //0表示高时延要求
         DelayType.put(1, 1);
-        DelayType.put(2, 0);
-        DelayType.put(3, 1);
-        DelayType.put(4, 0);
-        DelayType.put(5, 1);
-        DelayType.put(6, 0);
-        DelayType.put(7, 1);           //7表示低时延要求
+        DelayType.put(2, 2);
+        DelayType.put(3, 3);
+        DelayType.put(4, 4);
+        DelayType.put(5, 5);
+        DelayType.put(6, 6);
+        DelayType.put(7, 7);           //7表示低时延要求
 
         //我不确定这个是不是需要，先写着吧
         ToSLevelNum = BandwidthType.size()*LossRateType.size()*DelayType.size();
@@ -622,15 +623,15 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
             @Override
             public void run() {
                    while(true) {
-                       copySwitchLinks();  //获取拓扑
-                       predictLinkCost = linkCost;     //暂时先这么写
-                       routeCompute();
-                       UpdateFlowTable();
-                       //allDevices = deviceManager.getAllDevices();
-                       log.info("run RouteByToS");
                        try {
+                           copySwitchLinks();  //获取拓扑
+                           predictLinkCost = linkCost;     //暂时先这么写
+                           routeCompute();
+                           UpdateFlowTable();
+                           //allDevices = deviceManager.getAllDevices();
+                           log.info("run RouteByToS");
                            Thread.sleep(5000);
-                       } catch (InterruptedException e) {
+                       } catch (Exception e) {
                            e.printStackTrace();
                        }
                    }

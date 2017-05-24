@@ -16,14 +16,17 @@
 
 package net.floodlightcontroller.core;
 
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-
 import net.floodlightcontroller.core.internal.CmdLineSettings;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.FloodlightModuleLoader;
 import net.floodlightcontroller.core.module.IFloodlightModuleContext;
 import net.floodlightcontroller.restserver.IRestApiService;
+import net.floodlightcontroller.util.MultiOutputstream;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 
 /**
  * Host for the Floodlight main method
@@ -38,6 +41,14 @@ public class Main {
      */
     public static void main(String[] args) throws FloodlightModuleException {
         // Setup logger
+        try {
+            PrintStream oldPrintStream = System.out;
+            FileOutputStream bos = new FileOutputStream("controllerLog");
+            MultiOutputstream multi = new MultiOutputstream(new PrintStream(bos),oldPrintStream);
+            System.setOut(new PrintStream(multi));
+        }catch (Exception e){
+            System.out.println("Fail to set outputstream");;
+        }
         System.setProperty("org.restlet.engine.loggerFacadeClass", 
                 "org.restlet.ext.slf4j.Slf4jLoggerFacade");
         

@@ -11,6 +11,7 @@ import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.util.SingletonTask;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
+import net.floodlightcontroller.linkdiscovery.LinkInfo;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import org.openflow.protocol.OFPort;
@@ -53,13 +54,16 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 	//当前的拓扑信息
     private Map<Long, IOFSwitch> switchMap = new HashMap<>();
     private Map<Long, Set<Link>> switchLinks = new HashMap<>();
+	private  Map<Link, LinkInfo> allLinks = new HashMap<>();
 
 	//配置类：预先设定光节点set
 	private void setFiberNodeSet(){
 		FiberNodeSet.add(new Long(1));
+		FiberNodeSet.add(new Long(2));
 		FiberNodeSet.add(new Long(3));
 		FiberNodeSet.add(new Long(4));
-		FiberNodeSet.add(new Long(5));
+		FiberNodeSet.add(new Long(8));
+
 	}
 
 	/**
@@ -98,7 +102,12 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
         return this.switchLinks;
     }
 
-    //	/**
+	@Override
+	public Map<Link, LinkInfo> getLinks() {
+		return this.allLinks;
+	}
+
+	//	/**
 //	 * linkCostEnergySaving的getter方法
 //	 * @return
 //	 */
@@ -337,8 +346,12 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 			public void run() {
 			    switchMap.clear();
 			    switchLinks.clear();
+			    allLinks.clear();
                 switchMap.putAll(floodlightProvider.getAllSwitchMap());
-                switchLinks.putAll(linkDiscoveryManager.getSwitchLinks());
+                synchronized (linkDiscoveryManager) {
+					switchLinks.putAll(linkDiscoveryManager.getSwitchLinks());
+					allLinks.putAll(linkDiscoveryManager.getLinks());
+				}
 				try {
 					mapTrafficToLinkCost();
 					updateLinkCost();
