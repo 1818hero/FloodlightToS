@@ -142,11 +142,14 @@ public class LinkCostManager implements ILinkCostService, IFloodlightModule,
 					Iterator<Link> iteratorLink = links.iterator();
 					while (iteratorLink.hasNext()) {
 						Link link = iteratorLink.next();
-						short portNumber = link.getSrcPort();
-						long dpid1 = link.getSrc();
-						Double cost = switchPortRateMap.get(dpid1).get(
-								portNumber).get(0)+switchPortRateMap.get(dpid1).get(portNumber).get(1);   //选取链路源端口的发送速率和接收速率之和作为这个链路的链路权重
-                        linkCost.put(link, cost);
+						short srcPortNumber = link.getSrcPort();
+						short dstPortNumber = link.getDstPort();
+						long dpidSrc = link.getSrc();
+						long dpidDst = link.getDst();
+						//Double cost = switchPortRateMap.get(dpid1).get(
+							//portNumber).get(0)+ switchPortRateMap.get(dpid1).get(portNumber).get(1);   //选取链路源端口的发送速率和接收速率之和作为这个链路的链路权重
+						Double cost = Math.min(switchPortRateMap.get(dpidSrc).get(srcPortNumber).get(0),switchPortRateMap.get(dpidDst).get(dstPortNumber).get(1));
+						linkCost.put(link, cost);
                         //更新链路类型，默认为CableLink
                         linkTypeMap.put(link, judgeLinkType(link));
                         if (MaxLinkCompacity < linkTypeMap.get(link).getBandwidth()-cost){

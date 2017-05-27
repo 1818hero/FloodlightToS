@@ -66,7 +66,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     private static Map<Integer, Integer> DelayType = new HashMap<>();
 
     //ToS分级数目
-    private static int ToSLevelNum ;
+    //private static int ToSLevelNum ;
     //拓扑描述
     Map<Long, Set<Link>> switchLinks = new HashMap<>();
     Map<Link, LinkInfo> allLinks = new HashMap<>();
@@ -125,22 +125,11 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         }
         //如果linkDiscoveryManager还未更新则不更新任何数据
         if(switchLinks==null||switchLinks.isEmpty())    return;
-//        Set<Long> keys = switchLinks.keySet();
-//        Iterator<Long> iter1 = keys.iterator();
-//        while (iter1.hasNext()) {
-//            Long key = iter1.next();
-//            Set<Link> links = switchLinks.get(key);
-//            Set<Link> srcLink = new HashSet<Link>();
-//            Iterator<Link> iter2 = links.iterator();
-//            while (iter2.hasNext()) {
-//                Link link = iter2.next();
-//                if (key == link.getSrc()) {
-//                    srcLink.add(link);
-//                }
-//            }
-//            wholeTopology.put(key, srcLink);
-//
-//        }
+
+        for(Link link : linkCost.keySet()){
+            log.info("LinkCostRecord {} to {} : {} Mbps",new Object[]{link.getSrc(),link.getDst(),linkCost.get(link)});
+        }
+
         /**
          * 将拓扑结构复制为邻接矩阵的形式
          * @Author Victor
@@ -506,8 +495,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                             }
                             break;
                         }
-                        if(curToS>0)    log.info("No matched route for current ToS , auto decrease ToS level to {}",curToS);
-                        else            log.warn("No matched route in route cache");
+                        //if(curToS>0)    log.info("No matched route for current ToS , auto decrease ToS level to {}",curToS);
+                        //else            log.warn("No matched route in route cache");
                     }
                 }
             }
@@ -561,10 +550,10 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
 
         //初始化各个ToS类型
         //前两位
-        BandwidthType.put(0, 0.0);     //0表示无带宽占用
+        BandwidthType.put(0, 0.0);    //0表示无带宽占用
         BandwidthType.put(1, 1.0);    //1表示低带宽占用
-        BandwidthType.put(2, 5.0);    //2表示高带宽占用
-        BandwidthType.put(3, 8.0);    //3表示极高带宽占用
+        BandwidthType.put(2, 2.0);    //2表示高带宽占用
+        BandwidthType.put(3, 3.0);    //3表示极高带宽占用
         //中间一位
         LossRateType.put(0,1.0);       //0表示无要求
         LossRateType.put(1,0.0);       //1表示有要求
@@ -579,7 +568,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
         DelayType.put(7, 7);           //7表示低时延要求
 
         //我不确定这个是不是需要，先写着吧
-        ToSLevelNum = BandwidthType.size()*LossRateType.size()*DelayType.size();
+        //ToSLevelNum = BandwidthType.size()*LossRateType.size()*DelayType.size();
 
         //初始化自定义ToS类型
         for(Integer bandwith : BandwidthType.keySet()){
@@ -627,6 +616,14 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                            copySwitchLinks();  //获取拓扑
                            predictLinkCost = linkCost;     //暂时先这么写
                            routeCompute();
+                           for(Byte tos : routeCache.keySet()){
+                               for(RouteId rID : routeCache.get(tos).keySet()){
+                                   if(rID.getSrc().equals(new Long(1))&&rID.getDst().equals(new Long(8))){
+                                       log.info("ToS {} route 1 to 8 : next hop is {}", new Object[]{tos,
+                                               routeCache.get(tos).get(rID).getPath().get(1).getNodeId()});
+                                   }
+                               }
+                           }
                            UpdateFlowTable();
                            //allDevices = deviceManager.getAllDevices();
                            log.info("run RouteByToS");
