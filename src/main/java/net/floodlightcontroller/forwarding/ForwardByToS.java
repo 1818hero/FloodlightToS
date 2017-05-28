@@ -152,57 +152,24 @@ public class ForwardByToS extends ForwardingBase implements IFloodlightModule {
                 IDeviceService.fcStore.
                         get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
         if (dstDevice != null) {
-            IDevice srcDevice =
-                    IDeviceService.fcStore.
-                            get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
-            if (srcDevice == null) {
-                log.debug("No device entry found for source device");
-                return;
-            }
-            // Install all the routes where both src and dst have attachment
-            // points.  Since the lists are stored in sorted order we can
-            // traverse the attachment points in O(m+n) time
-            SwitchPort[] srcDaps = srcDevice.getAttachmentPoints();
-
-            SwitchPort[] dstDaps = dstDevice.getAttachmentPoints();
-
             byte DSCP = match.getNetworkTypeOfService();
-            //ToS计算规则
-            //int ToSLevel = (DSCP&0x03)+((DSCP>>2)&0x03)+((DSCP>>4)&0x03);
-            int PathCost = INF;
-            SwitchPort pickedSrc = null;
-            SwitchPort pickedDst = null;
-            //从所有接入点中选择路径最短的一条
-            for(SwitchPort srcDap : srcDaps){
-                for(SwitchPort dstDap : dstDaps){
-                    Route r = router.getRoute(srcDap.getSwitchDPID(), dstDap.getSwitchDPID(), 0, DSCP, true);
-                    if(r!=null){
-                        if(r.getRouteCount()<PathCost){
-                            PathCost = r.getRouteCount();
-                            pickedSrc = srcDap;
-                            pickedDst = dstDap;
-                        }
-                    }
+            Map<Integer,SwitchPort> IPmap = router.getAttachmentMap();
+            SwitchPort[] dstDaps = new SwitchPort[dstDevice.getIPv4Addresses().length];
+            for(int i=0;i<dstDaps.length;i++){
+                dstDaps[i] = IPmap.get(dstDevice.getIPv4Addresses()[i]);
+            }
+            Route route=null;
+            for(SwitchPort dstDap : dstDaps) {
+                while(route==null&&DSCP>=0) {
+                    //r = router.getRoute(sw.getId(), dstDap.getSwitchDPID(), 0, DSCP--, true);
+                    route = router.getRoute(sw.getId(),
+                            pi.getInPort(),
+                            dstDap.getSwitchDPID(),
+                            (short)dstDap.getPort(),
+                            0,DSCP--,true);
                 }
             }
-            if(pickedDst==null||pickedSrc==null){
-                log.error("no proper attachment");
-                return;     //可能正在更新路由表或者不连通
-            }
-            Route route = router.getRoute(pickedSrc.getSwitchDPID(),
-                    (short)pickedSrc.getPort(),
-                    pickedDst.getSwitchDPID(),
-                    (short)pickedDst.getPort(),
-                    0,DSCP,true);
-
             if (route != null) {
-                if (log.isTraceEnabled()) {
-                    log.trace("pushRoute match={} route={} " +
-                                    "destination={}:{}",
-                            new Object[] {match, route,
-                                    pickedDst.getSwitchDPID(),
-                                    pickedSrc.getPort()});
-                }
                 long cookie =
                         AppCookie.makeCookie(FORWARDING_APP_ID, 0);
 

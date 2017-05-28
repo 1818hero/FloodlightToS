@@ -96,6 +96,9 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     //private Map<Byte, List<List<Integer>>> dist;
     // 路由结果
     private TreeMap<Byte,Map<RouteId,Route>> routeCache = new TreeMap<>();
+
+
+
     //IP地址对应的接入点
     private Map<Integer, SwitchPort>  attachmentMap = new HashMap<>();
     // 顶点集合
@@ -627,9 +630,14 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
                            UpdateFlowTable();
                            //allDevices = deviceManager.getAllDevices();
                            log.info("run RouteByToS");
-                           Thread.sleep(5000);
                        } catch (Exception e) {
                            e.printStackTrace();
+                       } finally {
+                           try {
+                               Thread.sleep(5000);
+                           } catch (InterruptedException e) {
+                               e.printStackTrace();
+                           }
                        }
                    }
 
@@ -639,10 +647,8 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     }
     @Override
     public Route getRoute(long srcId, short srcPort, long dstId, short dstPort, long cookie, Byte TosLevel, boolean tunnelEnabled){
-        // Return null the route source and desitnation are the
-        // same switchports.
         if (srcId == dstId && srcPort == dstPort)
-            return null;
+            return new Route(srcId,dstId);
 
         List<NodePortTuple> nptList;
         NodePortTuple npt;
@@ -665,7 +671,7 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     }
     @Override
     public Route getRoute(long src, long dst, long cookie, Byte ToS, boolean tunnelEnabled){
-        if(src==dst) return null;
+        if(src==dst) return new Route(src,dst);
         RouteId id = new RouteId(src, dst);
         Route result = null;
         try {
@@ -758,6 +764,10 @@ public class RouteByToS implements IFloodlightModule, IRouteByToS, IOFMessageLis
     @Override
     public String getName() {
         return "RouteByToS";
+    }
+
+    public Map<Integer, SwitchPort> getAttachmentMap() {
+        return attachmentMap;
     }
 
     @Override

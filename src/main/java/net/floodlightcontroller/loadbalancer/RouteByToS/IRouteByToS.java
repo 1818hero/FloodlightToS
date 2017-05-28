@@ -1,6 +1,7 @@
 package net.floodlightcontroller.loadbalancer.RouteByToS;
 
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.routing.Route;
@@ -13,7 +14,7 @@ import java.util.Set;
  */
 public interface IRouteByToS extends IFloodlightService, IRoutingService {
     public Map<Link, Double> getLinkCost();
-
+    public Map<Integer, SwitchPort> getAttachmentMap();
     /**
      * 根据ToS级别获取相应路由
      * @param src 源交换机dpid
